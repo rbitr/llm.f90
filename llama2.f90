@@ -121,6 +121,10 @@ allocate(s%att(seq_len,n_heads))
 allocate(s%key_cache(emb_dim,seq_len,n_layers))
 allocate(s%value_cache(emb_dim,seq_len,n_layers))
 
+s%att(:,:) = 0
+s%key_cache(:,:,:) = 0
+s%value_cache(:,:,:) = 0
+
         ! read in token vocab
         open(UNIT=5, FILE="tokenizer.bin", FORM="UNFORMATTED", ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
 
@@ -352,25 +356,27 @@ contains
           !q_t = q[h*head_size:(h+1)*head_size] #q[h*headsize] is the start
         
           !  for t in range(pos+1):
-          do t = 1,pos
+          ! here
+          do t = 1,(pos)
             k_t = s%key_cache((h*head_size+1):((h+1)*head_size),t,l)
-            s%att(t,h) = dot_product(q_t,k_t)/sqrt(real(head_size))
+            s%att(t,h+1) = dot_product(q_t,k_t)/sqrt(real(head_size))
           !      k_t = s["key_cache"][l][t][h*head_size:(h+1)*head_size]
           !      score = np.dot(q_t,k_t)/np.sqrt(head_size)
           !      s["att"][h][t] = score
           end do  
           
           ! beginning to POS, inclusive. so if pos = 1, there is 1...      
-          s%att(:,h) = softmax(s%att(:,h),pos)
+          s%att(:,h+1) = softmax(s%att(:,h+1),pos)
           !  s["att"][h] = softmax(s["att"][h],pos+1)
           xbh(:) = 0  
           !  xbh = np.zeros(head_size)
             
           !  for t in range(pos+1):
-          do t = 1,pos
+          ! here
+          do t = 1,(pos) 
             v_t = s%value_cache((h*head_size+1):((h+1)*head_size),t,l)      
           !      v_t = s["value_cache"][l][t][h*head_size:(h+1)*head_size]
-            a = s%att(t,h)
+            a = s%att(t,h+1)
             xbh = xbh + a*v_t  
           !      a = s["att"][h][t]
           !      xbh += a*v_t

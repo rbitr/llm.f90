@@ -5,6 +5,11 @@ Toy LLaMA2 model inference in Fortran
 
 This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.c It's based on a version of the code circa July 28, 2023. The project has since become way more complicated.
 
+## What
+
+LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results.
+
+
 ## Why
 
 I saw a discussion last week about Fotran and realized I had never used it and it looked interesting: https://news.ycombinator.com/item?id=37295144
@@ -23,7 +28,7 @@ Things I liked:
 
 Interesting things (I could be wrong about some):
 
-- 1 based indexing
+- 1 based indexing (and off-by one errors can have a very subtle impact on output)
 - column major arrays
 - fixed size strings in arrays
 - no native way to tell if a string has trailing spaces (important for tokenization)
@@ -53,14 +58,15 @@ Compile (only tested with GNU Fortran on Ubuntu)
 gfortran llama2.f90 -o llm
 ```
 
-Run
+Run (arguments for temperature and prompt are optinoal but are positional so if you specify a prompt you also need a temperature. T=0 is deterministic.
 ```bash
 ./llm 0.9 "There was a man"
-There was a man and his wife. They lived in a small house. The man was bald and the wife was Tom. The man liked to drive his car.
-One day, Tom and his wife went outside. They saw a big tree. Tom said, "I want to drive the tree!" He got in his car and started to drive around the tree.
-Tom's wife watched him. She smiled. She said, "Tom, you can drive when I am with you." Tom smiled back. They played together until it was time to go home.
+There was a man who had lots of cheese. He wanted to keep some for himself, so he tried to cut it himself. But the cheese was too fragile and he cut it anyway. 
+The man was very unhappy and he felt really bad. He realized that he should have left the cheese in the house. 
+So the man decided to go to get it back, but were too late. Little didn't make it. 
+The man never got his cheese back. He sadly ate it alone and never found another one.
 <s>
- Once upon a time, there was a little girl named Lily. She loved to play outside in the sunshine and pick flowers. One day, she saw a big thing in the sky. It was a plane! It made a loud noise, but it didn't hurt much.
-Lily climbed down from the cloud and went to the beach. She saw a dolphin swimming in the water. The dolphin was so pretty, Lily wanted to play with it. But the dolphin was too far away and wouldn't come closer.
-Lily was sad that she couldn't playful shore. She saw the dolphbled a dol 
+ Once upon a time, there was an old dog named Buddy. Buddy loved to play outside in the dirty mud. One day, he found a big pile of corn. He thought it was fun to play with the corn.
+Buddy's friend, a little girl named Lily, came by and saw the corn. She told Buddy not to play with it. But some of the corn was dirty. Buddy did not care. He just wanted to play with the corn. So, Buddy jumped into the mud and got himself all dirty.
+Lily helped Buddy get clean. She told him it was okay to play with the
 ```
