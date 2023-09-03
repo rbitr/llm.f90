@@ -7,14 +7,16 @@ This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.
 
 ## What
 
-LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results.
+LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results. It's a bit of a wall of code, but should make sense in the context of the ipython notebook linked below and the llama2.c project. 
 
 
 ## Why
 
 I saw a discussion last week about Fotran and realized I had never used it and it looked interesting: https://news.ycombinator.com/item?id=37295144
 
-This seemed like a good way to learn and explore Fortran for machine learning type programming
+This seemed like a good way to learn and explore Fortran for machine learning type programming. 
+
+See also https://github.com/rbitr/llama2.ipynb my implementation in python. Python was easier, Fortran was more fun!
 
 ## Impressions
 
