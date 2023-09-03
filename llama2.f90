@@ -1,51 +1,52 @@
-module my_module
-  implicit none
-  type TransformerWeights
-    real, allocatable :: token_embedding_table(:,:)
-    real, allocatable :: rms_att_weight(:,:)
-    real, allocatable :: rms_ffn_weight(:,:)
-    real, allocatable :: wq(:,:,:)
-    real, allocatable :: wk(:,:,:)
-    real, allocatable :: wv(:,:,:)
-    real, allocatable :: wo(:,:,:)
-    real, allocatable :: w1(:,:,:)
-    real, allocatable :: w2(:,:,:)
-    real, allocatable :: w3(:,:,:)
-    real, allocatable :: rms_final_weight(:)
-    real, allocatable :: freq_cis_real(:,:)
-    real, allocatable :: freq_cis_imag(:,:)
+! llama2.f90
+! implementation of a toy llama model
+
+! structs 
+module weight_module
+        implicit none
+        type TransformerWeights
+                real, allocatable :: token_embedding_table(:,:)
+                real, allocatable :: rms_att_weight(:,:)
+                real, allocatable :: rms_ffn_weight(:,:)
+                real, allocatable :: wq(:,:,:)
+                real, allocatable :: wk(:,:,:)
+                real, allocatable :: wv(:,:,:)
+                real, allocatable :: wo(:,:,:)
+                real, allocatable :: w1(:,:,:)
+                real, allocatable :: w2(:,:,:)
+                real, allocatable :: w3(:,:,:)
+                real, allocatable :: rms_final_weight(:)
+                real, allocatable :: freq_cis_real(:,:)
+                real, allocatable :: freq_cis_imag(:,:)
   
-    end type TransformerWeights
+        end type TransformerWeights
 
-  type Config
-    INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
-  end type Config
+        type Config
+                INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+        end type Config
 
-  type RunState
+        type RunState
 
-    real, allocatable :: att(:,:)
-    real, allocatable :: key_cache(:,:,:)
-    real, allocatable :: value_cache(:,:,:)
+                real, allocatable :: att(:,:)
+                real, allocatable :: key_cache(:,:,:)
+                real, allocatable :: value_cache(:,:,:)
 
-  end type RunState
+        end type RunState
 
+end module weight_module
 
-
-end module my_module
-
-program read_test 
-use my_module
-! stories15M.bin
-INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
-!REAL, allocatable :: token_embedding_table (:,:)
-type(TransformerWeights) :: weights
-integer :: head_size, tmp
-type(config) :: conf
-type(RunState) :: s
-real, allocatable :: logits(:)
-real, allocatable :: freq_buf(:)
-integer :: pos
-integer :: token
+program llama2 
+        use weight_module
+        
+        INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+        type(TransformerWeights) :: weights
+        integer :: head_size, tmp
+        type(config) :: conf
+        type(RunState) :: s
+        real, allocatable :: logits(:)
+        real, allocatable :: freq_buf(:)
+        integer :: pos
+        integer :: token
 
 !for the tokens
 
@@ -524,4 +525,4 @@ contains
 
 
 
-end program read_test
+end program llama2
