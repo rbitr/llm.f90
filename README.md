@@ -9,6 +9,7 @@ This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.
 
 LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results. It's a bit of a wall of code, but should make sense in the context of the ipython notebook linked below and the llama2.c project. 
 
+I've since found out there are Fortran implementations of inference for various GPT models: https://github.com/certik/fastgpt 
 
 ## Why
 
@@ -25,7 +26,7 @@ Things I liked:
 - memory management
 - array slicing
 - intrinsics (higher level functions like `matmul`)
-- seemingly fast (in my preliminary inaccurate test it beats llama2.c with default compiler options)
+- seemingly fast - with default compiler options, I get ~165 tokens/s from this implementation vs. 75 tokens/s from llama2.c on my 2021 Thinkpad. However, using OMP parallelization I get 250 tokens/s with llama2.c. 
 - fun
 
 Interesting things (I could be wrong about some):
@@ -38,7 +39,7 @@ Interesting things (I could be wrong about some):
 - trims matrix operation results to fit arrays? 
 - harder to find answers to questions
 - confusion about different standards; I think this is 2003 compliant
-- parallelization (still not explored)
+- parallelization  
 
 Overall, I can see how Fortran is competitive with C for compiled ML applications that have lots of linear algebra and run naively on the cpu. It has the right intrinsic functions, handles memory more easily than C (though declarations are awkward) and handles arrays natively. It remains to be seen how easily it works with other accelerators (BLAS, etc). 
 

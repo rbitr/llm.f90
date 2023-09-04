@@ -66,6 +66,9 @@ program llama2
         real :: temperature
         character(:), allocatable :: prompt
 
+        ! timing
+        real :: t_ms_start, t_ms_end
+
         ! open the model file 
         open(UNIT=5, FILE="stories15M.bin", FORM="UNFORMATTED", ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
                 ! config
@@ -187,12 +190,14 @@ program llama2
         prompt = ""
 
         end if
+        
+        t_ms_start = 0
 
         ! encode the prompt
         prompt_tokens = bpe_encode(prompt)
 
         ! indexing starts at 1, s is <s> BOS token        
-        
+            
         token = 2
         
         ! autoregressive model. get the next token from the last
@@ -204,7 +209,6 @@ program llama2
                         token = prompt_tokens(pos)
 
                 else
-
                         if (temperature == 0) then
                                 token = maxloc(logits,DIM=1)
                         else
@@ -215,13 +219,31 @@ program llama2
 
                 ! here we kept track of the length to display each token properly
                 write (*,fmt="(A)", advance="no") vocab(token)(1:vocab_len(token))
-
+                
+                ! start after first token as in llama2.c
+                if (t_ms_start == 0) then
+                        t_ms_start = time_ms()
+                end if
         end do
+        t_ms_end = time_ms()
         print *,""
+        print *, "Inference time: ", (t_ms_end-t_ms_start)/1000, " seconds" 
+        print *, 1000*seq_len/(t_ms_end-t_ms_start), "tokens/second"
         ! end of __main__       
 
 ! functions 
 contains 
+
+        function time_ms() result(t_ms)
+                real :: t_ms
+                integer :: times(8)
+
+                call date_and_time(values=times)
+
+                t_ms = (times(5)*3600. + times(6)*60. + times(7)) * 1000. + times(8)
+        end function
+
+
 
         ! sample from softmax probabilities  
         function sample(p) result(i)
@@ -255,10 +277,10 @@ contains
               xr = x*w/xn
         end function
       
-
-        function softmax(x,s) result (p)
-              real :: x(:)
-              integer :: s
+        ! declared as "pure" for potentiall parallelization of heads
+        pure function softmax(x,s) result (p)
+              real, intent(in) :: x(:)
+              integer, intent(in) :: s
               real :: p(size(x))
               real :: xi(s)
 
@@ -350,7 +372,9 @@ contains
                         
                         ! multi head attention and fc layers
                         do h = 0,(p%n_heads-1)        
-            
+                        ! alternately uncomment below to make explicitly concurrent 
+                        !do concurrent (h =1:(p%n_heads-1))
+
                         q_t = q((h*head_size+1):((h+1)*head_size))
           
                         do t = 1,(pos)
@@ -370,7 +394,7 @@ contains
         
                         xb((h*head_size+1):((h+1)*head_size)) = xbh
                        
-                        end do 
+                        end do  
 
 
                         x = x + matmul(xb, w%wo(:,:,l))
