@@ -1,10 +1,17 @@
 ! llama2.f90
 ! implementation of a toy llama model
 
+! set precision of reals (here default which is 4 byte)
+module precision_module
+  implicit none
+  integer, parameter :: wp = kind(1.0)
+end module precision_module
+
 ! structs for reading weights, config information and state 
 module weight_module
+        use precision_module
         implicit none
-        integer, parameter :: wp = kind(1.0)
+        private wp
         type TransformerWeights
                 real(kind=wp), allocatable :: token_embedding_table(:,:)
                 real(kind=wp), allocatable :: rms_att_weight(:,:)
@@ -37,6 +44,7 @@ module weight_module
 end module weight_module
 
 program llama2 
+        use precision_module
         use weight_module
         
         ! weights and states
