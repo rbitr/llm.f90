@@ -1,23 +1,31 @@
 ! llama2.f90
 ! implementation of a toy llama model
 
+! set precision of reals (here default which is 4 byte)
+module precision_module
+  implicit none
+  integer, parameter :: wp = kind(1.0)
+end module precision_module
+
 ! structs for reading weights, config information and state 
 module weight_module
+        use precision_module
         implicit none
+        private wp
         type TransformerWeights
-                real, allocatable :: token_embedding_table(:,:)
-                real, allocatable :: rms_att_weight(:,:)
-                real, allocatable :: rms_ffn_weight(:,:)
-                real, allocatable :: wq(:,:,:)
-                real, allocatable :: wk(:,:,:)
-                real, allocatable :: wv(:,:,:)
-                real, allocatable :: wo(:,:,:)
-                real, allocatable :: w1(:,:,:)
-                real, allocatable :: w2(:,:,:)
-                real, allocatable :: w3(:,:,:)
-                real, allocatable :: rms_final_weight(:)
-                real, allocatable :: freq_cis_real(:,:)
-                real, allocatable :: freq_cis_imag(:,:)
+                real(kind=wp), allocatable :: token_embedding_table(:,:)
+                real(kind=wp), allocatable :: rms_att_weight(:,:)
+                real(kind=wp), allocatable :: rms_ffn_weight(:,:)
+                real(kind=wp), allocatable :: wq(:,:,:)
+                real(kind=wp), allocatable :: wk(:,:,:)
+                real(kind=wp), allocatable :: wv(:,:,:)
+                real(kind=wp), allocatable :: wo(:,:,:)
+                real(kind=wp), allocatable :: w1(:,:,:)
+                real(kind=wp), allocatable :: w2(:,:,:)
+                real(kind=wp), allocatable :: w3(:,:,:)
+                real(kind=wp), allocatable :: rms_final_weight(:)
+                real(kind=wp), allocatable :: freq_cis_real(:,:)
+                real(kind=wp), allocatable :: freq_cis_imag(:,:)
   
         end type TransformerWeights
 
@@ -27,15 +35,16 @@ module weight_module
 
         type RunState
 
-                real, allocatable :: att(:,:)
-                real, allocatable :: key_cache(:,:,:)
-                real, allocatable :: value_cache(:,:,:)
+                real(kind=wp), allocatable :: att(:,:)
+                real(kind=wp), allocatable :: key_cache(:,:,:)
+                real(kind=wp), allocatable :: value_cache(:,:,:)
 
         end type RunState
 
 end module weight_module
 
 program llama2 
+        use precision_module
         use weight_module
         
         ! weights and states
@@ -44,30 +53,30 @@ program llama2
         integer :: head_size, tmp
         type(config) :: conf
         type(RunState) :: s
-        real, allocatable :: logits(:)
-        real, allocatable :: freq_buf(:)
+        real(kind=wp), allocatable :: logits(:)
+        real(kind=wp), allocatable :: freq_buf(:)
 
         !for the tokens
 
         integer :: pos
         integer :: token        
-        real :: score
+        real(kind=wp) :: score
         integer :: tok_len, max_len, n
         !integer :: vocab_size = 32000
         character(:), allocatable :: tmpstr
         character(:), dimension(:), allocatable :: vocab
-        real,allocatable :: scores(:)
+        real(kind=wp),allocatable :: scores(:)
         integer, allocatable :: prompt_tokens(:)
         integer, allocatable :: vocab_len(:)
         
         ! command line arguments
         integer :: num_args
         character(64) :: arg
-        real :: temperature
+        real(kind=wp) :: temperature
         character(:), allocatable :: prompt
 
         ! timing
-        real :: t_ms_start, t_ms_end
+        real(kind=wp) :: t_ms_start, t_ms_end
 
         ! open the model file 
         open(UNIT=5, FILE="stories15M.bin", FORM="UNFORMATTED", ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
@@ -235,7 +244,7 @@ program llama2
 contains 
 
         function time_ms() result(t_ms)
-                real :: t_ms
+                real(kind=wp) :: t_ms
                 integer :: times(8)
 
                 call date_and_time(values=times)
@@ -247,9 +256,9 @@ contains
 
         ! sample from softmax probabilities  
         function sample(p) result(i)
-              real :: p(:)
+              real(kind=wp) :: p(:)
               integer :: i
-              real :: r, cdf
+              real(kind=wp) :: r, cdf
 
               call random_number(r)
               cdf = 0
@@ -269,9 +278,9 @@ contains
       
         ! normalize and apply weigths. Note fortran built in dot product    
         function rmsnorm(x,w) result(xr)
-              real :: x(:), w(:)
-              real :: xr(size(x))
-              real :: xn
+              real(kind=wp) :: x(:), w(:)
+              real(kind=wp) :: xr(size(x))
+              real(kind=wp) :: xn
               xn = sqrt(dot_product(x,x)/size(x)+1e-5)
 
               xr = x*w/xn
@@ -279,10 +288,10 @@ contains
       
         ! declared as "pure" for potentiall parallelization of heads
         pure function softmax(x,s) result (p)
-              real, intent(in) :: x(:)
+              real(kind=wp), intent(in) :: x(:)
               integer, intent(in) :: s
-              real :: p(size(x))
-              real :: xi(s)
+              real(kind=wp) :: p(size(x))
+              real(kind=wp) :: xi(s)
 
               p(:) = 0
               xi = exp(x(:s)-maxval(x(:s)))
@@ -297,31 +306,31 @@ contains
                 type(Config), intent(in) :: p
                 type(Runstate) :: s
                 type(TransformerWeights), intent(in) :: w
-                real :: logits(p%vocab_size)
+                real(kind=wp) :: logits(p%vocab_size)
 
-                real :: x(p%emb_dim)
-                real :: xb(p%emb_dim)
-                real :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
-                real :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
+                real(kind=wp) :: x(p%emb_dim)
+                real(kind=wp) :: xb(p%emb_dim)
+                real(kind=wp) :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
+                real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
                 ! embeddings
-                real :: q(emb_dim)
-                real :: k(emb_dim)
-                real :: v(emb_dim)
+                real(kind=wp) :: q(emb_dim)
+                real(kind=wp) :: k(emb_dim)
+                real(kind=wp) :: v(emb_dim)
       
                 ! position encoding  
-                real :: q0, q1, k0, k1, fcr, fci
+                real(kind=wp) :: q0, q1, k0, k1, fcr, fci
 
                 ! attention
-                real :: q_t(p%emb_dim/p%n_heads)
-                real :: k_t(p%emb_dim/p%n_heads)
-                real :: v_t(p%emb_dim/p%n_heads)
-                real :: xbh(p%emb_dim/p%n_heads)
-                real :: a
+                real(kind=wp) :: q_t(p%emb_dim/p%n_heads)
+                real(kind=wp) :: k_t(p%emb_dim/p%n_heads)
+                real(kind=wp) :: v_t(p%emb_dim/p%n_heads)
+                real(kind=wp) :: xbh(p%emb_dim/p%n_heads)
+                real(kind=wp) :: a
 
                 ! fc layers
-                real :: hb(hidden_dim)
-                real :: hb2(hidden_dim)
+                real(kind=wp) :: hb(hidden_dim)
+                real(kind=wp) :: hb2(hidden_dim)
       
                 ! counters etc
                 integer :: l, i, h, t, head_size
@@ -379,7 +388,7 @@ contains
           
                         do t = 1,(pos)
                         k_t = s%key_cache((h*head_size+1):((h+1)*head_size),t,l)
-                        s%att(t,h+1) = dot_product(q_t,k_t)/sqrt(real(head_size))
+                        s%att(t,h+1) = dot_product(q_t,k_t)/sqrt(real(head_size,wp))
                         end do  
           
                         ! beginning to POS, inclusive. so if pos = 1, there is 1...      
@@ -446,7 +455,7 @@ contains
                 integer, allocatable :: tokens(:)
                 integer, allocatable :: tmp_tokens(:)
                 integer :: i, ind, best_id, t1, t2
-                real :: score, best_score
+                real(kind=wp) :: score, best_score
                 character(:), dimension(:), allocatable :: running_merge
                 integer, allocatable :: running_merge_len(:)
 
