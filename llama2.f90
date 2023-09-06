@@ -245,11 +245,8 @@ contains
 
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
-                integer :: times(8)
-
-                call date_and_time(values=times)
-
-                t_ms = (times(5)*3600. + times(6)*60. + times(7)) * 1000. + times(8)
+                call cpu_time(t_ms)
+                t_ms = t_ms * 1000
         end function
 
 
