@@ -26,6 +26,7 @@ module weight_module
                 real(kind=wp), allocatable :: rms_final_weight(:)
                 real(kind=wp), allocatable :: freq_cis_real(:,:)
                 real(kind=wp), allocatable :: freq_cis_imag(:,:)
+                real(kind=wp), allocatable :: wcls(:,:)
   
         end type TransformerWeights
 
@@ -120,6 +121,7 @@ program llama2
         ! weights and states
         INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
         type(TransformerWeights) :: weights
+        logical :: shared_weights
         integer :: head_size, tmp
         type(config) :: conf
         type(RunState) :: s
@@ -171,6 +173,13 @@ program llama2
 
                 end if 
 
+                if (vocab_size > 0) then 
+                        shared_weights = .true.
+                else
+                        shared_weights = .false.
+                        vocab_size = -vocab_size
+                end if 
+
                 ! once we know the config sizes, allocate the arrays
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
                 allocate(weights%rms_att_weight(emb_dim,n_layers))
@@ -193,6 +202,7 @@ program llama2
                 allocate(weights%freq_cis_real(head_size/2,seq_len))
                 allocate(weights%freq_cis_imag(head_size/2,seq_len))
 
+
                 ! read everything in
                 read(5) weights%token_embedding_table
                 read(5) weights%rms_att_weight
@@ -207,6 +217,11 @@ program llama2
                 read(5) weights%rms_final_weight
                 read(5) weights%freq_cis_real
                 read(5) weights%freq_cis_imag
+
+                if (.not. shared_weights) then
+                        allocate(weights%wcls(emb_dim,vocab_size))
+                        read(5) weights%wcls
+                end if
 
         close(5) 
 
@@ -268,7 +283,7 @@ program llama2
         temperature = arg_values%temperature
         prompt = arg_values%prompt
 
-        if (arg_values%n < seq_len) then
+        if (arg_values%n <= seq_len) then
                 seq_len = arg_values%n
         else
                 print *, arg_values%n, "greater than maxinum squence length"
@@ -499,9 +514,11 @@ contains
 
       
       
-
-                logits = matmul(x,w%token_embedding_table)
-
+                if (shared_weights) then
+                        logits = matmul(x,w%token_embedding_table)
+                else
+                        logits = matmul(x,w%wcls)
+                end if
 
         end function
 
