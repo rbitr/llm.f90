@@ -43,9 +43,79 @@ module weight_module
 
 end module weight_module
 
+module arg_parse
+        implicit none
+
+        type args
+                real :: temperature
+                character(:), allocatable :: model_file
+                character(:), allocatable :: prompt
+                logical :: verbose
+                integer :: n
+        end type args
+
+        contains
+
+                subroutine parse_args(arg_values)
+                        type(args) :: arg_values 
+                        integer :: i, num_args
+                        character(256) :: arg
+
+                        
+
+                        !defaults 
+                        arg_values%temperature = 0
+                        arg_values%model_file = "stories15M.bin"
+                        arg_values%prompt = ""
+                        arg_values%verbose = .false.
+                        arg_values%n = 256
+                
+                        num_args = command_argument_count()
+
+                        i = 1
+                        do while (i <= num_args)
+                                call get_command_argument(i, arg)
+                                        select case (arg)
+                                                case ('-m', '--model')
+                                                ! path to model file
+                                                call get_command_argument(i+1, arg)
+                                                arg_values%model_file = trim(arg)
+                                                i = i + 2
+                                                case ('-p', '--prompt')
+                                                ! prompt string
+                                                call get_command_argument(i+1, arg)
+                                                arg_values%prompt = trim(arg)
+                                                i = i + 2
+                                                case ('-t', '--temperature')
+                                                ! temperature scaling
+                                                call get_command_argument(i+1, arg)
+                                                read(arg,*) arg_values%temperature
+                                                i = i + 2
+                                                case ('-n', '--num_tokens')
+                                                ! number of tokens to generate, including prompt
+                                                call get_command_argument(i+1, arg)
+                                                read(arg,*) arg_values%n
+                                                i = i + 2
+                                                case ('-v', '--verbose')
+                                                ! print additional information
+                                                arg_values%verbose = .true.
+                                                i = i + 1
+                                                case default
+                                                print *, 'Unrecognized option:', trim(arg)
+                                                end select
+                        end do
+
+                        ! check for arguments
+
+
+                end subroutine
+
+end module arg_parse
+
 program llama2 
         use precision_module
         use weight_module
+        use arg_parse
         
         ! weights and states
         INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
@@ -70,18 +140,36 @@ program llama2
         integer, allocatable :: vocab_len(:)
         
         ! command line arguments
-        integer :: num_args
-        character(64) :: arg
-        real(kind=wp) :: temperature
+        !integer :: num_args
+        !character(64) :: arg
+        type (args) :: arg_values
+        real :: temperature
         character(:), allocatable :: prompt
+        logical :: verbose
 
         ! timing
         real(kind=wp) :: t_ms_start, t_ms_end
 
+        call parse_args(arg_values)
+
+        verbose = arg_values%verbose
+
         ! open the model file 
-        open(UNIT=5, FILE="stories15M.bin", FORM="UNFORMATTED", ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
+        open(UNIT=5, FILE=arg_values%model_file, FORM="UNFORMATTED",&
+                &ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
                 ! config
                 read(5) emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+                
+                if (verbose) then
+                        print *, "Embedding dimension: ", emb_dim
+                        print *, "Hidden dimension: ", hidden_dim
+                        print *, "Layers: ", n_layers
+                        print *, "Heads: ", n_heads
+                        print *, "kv Heads: ", n_kv_heads
+                        print *, "Vocabulary Size: ", vocab_size
+                        print *, "Sequence Length: ", seq_len
+
+                end if 
 
                 ! once we know the config sizes, allocate the arrays
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
@@ -176,30 +264,17 @@ program llama2
         ! argparse
         num_args = command_argument_count()
 
-        !print *, num_args
 
-        if (num_args>0) then
-                
-                call get_command_argument(1,arg)
-                read(arg,*) temperature
-                !print *, "Temp: ", temperature
+        temperature = arg_values%temperature
+        prompt = arg_values%prompt
 
+        if (arg_values%n < seq_len) then
+                seq_len = arg_values%n
         else
-
-                temperature = .9
-
+                print *, arg_values%n, "greater than maxinum squence length"
+                print *, "set to", seq_len
         end if
 
-        if (num_args>1) then
-                call get_command_argument(2,arg)
-                prompt = trim(arg)
-                !print *, "Prompt: ", prompt 
-        else
-
-        prompt = ""
-
-        end if
-        
         t_ms_start = 0
 
         ! encode the prompt

@@ -1,5 +1,5 @@
 # llama2.f90
-Toy LLaMA2 model inference in Fortran
+LLaMA2 model inference in Fortran
 
 ## Notice
 
@@ -26,7 +26,7 @@ Things I liked:
 - memory management
 - array slicing
 - intrinsics (higher level functions like `matmul`)
-- seemingly fast - with default compiler options, I get ~165 tokens/s from this implementation vs. 75 tokens/s from llama2.c on my 2021 Thinkpad. However, using OMP parallelization I get 250 tokens/s with llama2.c. 
+- seemingly fast - with default compiler options, I get ~165 tokens/s with the 15M model from this implementation vs. 75 tokens/s from llama2.c on my 2021 Thinkpad. However, using OMP parallelization I get 250 tokens/s with llama2.c. 
 - fun
 
 Interesting things (I could be wrong about some):
@@ -53,7 +53,10 @@ git clone https://github.com/rbitr/llama2.f90
 Download the trained model from HF
 ```bash
 cd llama2.f90
+# 15M parameter model
 wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
+# 42M parameter model
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
 ``` 
 
 Compile (only tested with GNU Fortran on Ubuntu)
@@ -61,15 +64,41 @@ Compile (only tested with GNU Fortran on Ubuntu)
 gfortran llama2.f90 -o llm
 ```
 
-Run (arguments for temperature and prompt are optinoal but are positional so if you specify a prompt you also need a temperature. T=0 is deterministic.
+Now supports some proper command line arguments
+
+List with the following hack:
 ```bash
-./llm 0.9 "There was a man"
-There was a man who had lots of cheese. He wanted to keep some for himself, so he tried to cut it himself. But the cheese was too fragile and he cut it anyway. 
-The man was very unhappy and he felt really bad. He realized that he should have left the cheese in the house. 
-So the man decided to go to get it back, but were too late. Little didn't make it. 
-The man never got his cheese back. He sadly ate it alone and never found another one.
+cat llama2.f90 | grep -A 1 "case ('" | awk '{$1=$1};1'
+case ('-m', '--model')
+! path to model file
+--
+case ('-p', '--prompt')
+! prompt string
+--
+case ('-t', '--temperature')
+! temperature scaling
+--
+case ('-n', '--num_tokens')
+! number of tokens to generate, including prompt
+--
+case ('-v', '--verbose')
+! print additional information
+```
+
+Run the model:
+
+
+```bash
+./llm -m stories42M.bin -n 256 -t 0.9 -p "There was a woman that lived in a shoe"
+There was a woman that lived in a shoe. She had lots of money, but she was very selfish.
+One day, she went to the little girl who lived in the village. "Can you play with me?" she asked. 
+The little girl was excited, but she was also scared. "What if the others show you how to be kind and generous?" she said.
+The woman thought for a moment. "Well," she said, "I'll go play, and when I do, I'll be kind."
+The little girl understood, and said goodbye. But she still watched on, ready to give the woman something, when she saw
 <s>
- Once upon a time, there was an old dog named Buddy. Buddy loved to play outside in the dirty mud. One day, he found a big pile of corn. He thought it was fun to play with the corn.
-Buddy's friend, a little girl named Lily, came by and saw the corn. She told Buddy not to play with it. But some of the corn was dirty. Buddy did not care. He just wanted to play with the corn. So, Buddy jumped into the mud and got himself all dirty.
-Lily helped Buddy get clean. She told him it was okay to play with the
+ Once upon a time, there was a little girl named Lily. She loved to play outside in the sunshine. One day, Lily and her friend Timmy went on a walk in the forest. They saw many trees and birds, and it was very peaceful.
+Suddenly, they heard a loud noise. A big bear appeared! "Quick, hurry!" cried Lily to Timmy. They ran as fast as they could, but the bear was getting closer.
+Just when they thought they were going to get 
+ Inference time:    3.83200002      seconds
+   66.8058472     tokens/second
 ```
