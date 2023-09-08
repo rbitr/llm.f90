@@ -1,3 +1,5 @@
 llm
 *.bin
 *.mod
+models/*
+*.o
