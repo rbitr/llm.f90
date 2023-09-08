@@ -51,6 +51,7 @@ module arg_parse
                 real :: temperature
                 character(:), allocatable :: model_file
                 character(:), allocatable :: prompt
+                character(:), allocatable :: tokenizer
                 logical :: verbose
                 integer :: n
         end type args
@@ -70,6 +71,7 @@ module arg_parse
                         arg_values%prompt = ""
                         arg_values%verbose = .false.
                         arg_values%n = 256
+                        arg_values%tokenizer = "tokenizer.bin"
                 
                         num_args = command_argument_count()
 
@@ -86,6 +88,11 @@ module arg_parse
                                                 ! prompt string
                                                 call get_command_argument(i+1, arg)
                                                 arg_values%prompt = trim(arg)
+                                                i = i + 2
+                                                case ('-s', '--tokenizer')
+                                                ! path to custom tokenizer
+                                                call get_command_argument(i+1, arg)
+                                                arg_values%tokenizer = trim(arg)
                                                 i = i + 2
                                                 case ('-t', '--temperature')
                                                 ! temperature scaling
@@ -245,7 +252,8 @@ program llama2
         s%value_cache(:,:,:) = 0
 
         ! read in token vocab
-        open(UNIT=5, FILE="tokenizer.bin", FORM="UNFORMATTED", ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
+        open(UNIT=5, FILE=arg_values%tokenizer, FORM="UNFORMATTED",&
+               & ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
 
                 read(5) max_len
 
