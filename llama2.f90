@@ -125,6 +125,7 @@ program llama2
         use precision_module
         use weight_module
         use arg_parse
+        use omp_lib
         
         ! weights and states
         INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
@@ -342,6 +343,35 @@ program llama2
 ! functions 
 contains 
 
+        function vm_matmul(a,b) result(c)
+                real(kind=wp) :: a(:)
+                real(kind=wp) :: b(:,:)
+                integer, allocatable :: s(:) 
+                real(kind=wp), allocatable :: c(:)
+                integer :: i,j
+                real(kind=wp) :: val
+
+                s = shape(b)
+                allocate(c(s(2)))
+                c (:) = 0
+                
+                
+                do concurrent (i=1:s(2))
+                        val = 0.0
+                        do j=1,size(a)
+                                val = val + a(j)*b(j,i)
+                        end do
+                        c(i) = val
+
+                end do
+
+                
+
+
+        end function
+
+
+
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
                 call cpu_time(t_ms)
@@ -446,9 +476,9 @@ contains
                         ! embed and project
                         xb = rmsnorm(x,w%rms_att_weight(:,l)) 
         
-                        q = matmul(xb,w%wq(:,:,l))
-                        k = matmul(xb,w%wk(:,:,l))
-                        v = matmul(xb,w%wv(:,:,l))
+                        q = vm_matmul(xb,w%wq(:,:,l))
+                        k = vm_matmul(xb,w%wk(:,:,l))
+                        v = vm_matmul(xb,w%wv(:,:,l))
        
                         ! position encoding
         
@@ -502,18 +532,18 @@ contains
                         end do  
 
 
-                        x = x + matmul(xb, w%wo(:,:,l))
+                        x = x + vm_matmul(xb, w%wo(:,:,l))
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
 
-                        hb = matmul(xb,w%w1(:,:,l))
-                        hb2 = matmul(xb,w%w3(:,:,l))
+                        hb = vm_matmul(xb,w%w1(:,:,l))
+                        hb2 = vm_matmul(xb,w%w3(:,:,l))
 
                         hb = hb*(1/(1+exp(-hb)))
 
                         hb = hb*hb2
-                        xb = matmul(hb,w%w2(:,:,l))
+                        xb = vm_matmul(hb,w%w2(:,:,l))
 
                         x = x + xb
 
@@ -524,9 +554,9 @@ contains
       
       
                 if (shared_weights) then
-                        logits = matmul(x,w%token_embedding_table)
+                        logits = vm_matmul(x,w%token_embedding_table)
                 else
-                        logits = matmul(x,w%wcls)
+                        logits = vm_matmul(x,w%wcls)
                 end if
 
         end function
