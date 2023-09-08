@@ -12,22 +12,40 @@ module weight_module
         use precision_module
         implicit none
         private wp
-        type TransformerWeights
-                real(kind=wp), allocatable :: token_embedding_table(:,:)
-                real(kind=wp), allocatable :: rms_att_weight(:,:)
-                real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-                real(kind=wp), allocatable :: wq(:,:,:)
-                real(kind=wp), allocatable :: wk(:,:,:)
-                real(kind=wp), allocatable :: wv(:,:,:)
-                real(kind=wp), allocatable :: wo(:,:,:)
-                real(kind=wp), allocatable :: w1(:,:,:)
-                real(kind=wp), allocatable :: w2(:,:,:)
-                real(kind=wp), allocatable :: w3(:,:,:)
-                real(kind=wp), allocatable :: rms_final_weight(:)
-                real(kind=wp), allocatable :: freq_cis_real(:,:)
-                real(kind=wp), allocatable :: freq_cis_imag(:,:)
-                real(kind=wp), allocatable :: wcls(:,:)
+        !type TransformerWeights
+        !        real(kind=wp), allocatable :: token_embedding_table(:,:)
+        !        real(kind=wp), allocatable :: rms_att_weight(:,:)
+        !        real(kind=wp), allocatable :: rms_ffn_weight(:,:)
+        !        real(kind=wp), allocatable :: wq(:,:,:)
+        !        real(kind=wp), allocatable :: wk(:,:,:)
+        !        real(kind=wp), allocatable :: wv(:,:,:)
+        !        real(kind=wp), allocatable :: wo(:,:,:)
+        !        real(kind=wp), allocatable :: w1(:,:,:)
+        !        real(kind=wp), allocatable :: w2(:,:,:)
+        !        real(kind=wp), allocatable :: w3(:,:,:)
+        !        real(kind=wp), allocatable :: rms_final_weight(:)
+        !        real(kind=wp), allocatable :: freq_cis_real(:,:)
+        !        real(kind=wp), allocatable :: freq_cis_imag(:,:)
+        !        real(kind=wp), allocatable :: wcls(:,:)
   
+        !end type TransformerWeights
+
+        type TransformerWeights
+                integer(2), allocatable :: token_embedding_table(:,:)
+                integer(2), allocatable :: rms_att_weight(:,:)
+                integer(2), allocatable :: rms_ffn_weight(:,:)
+                integer(2), allocatable :: wq(:,:,:)
+                integer(2), allocatable :: wk(:,:,:)
+                integer(2), allocatable :: wv(:,:,:)
+                integer(2), allocatable :: wo(:,:,:)
+                integer(2), allocatable :: w1(:,:,:)
+                integer(2), allocatable :: w2(:,:,:)
+                integer(2), allocatable :: w3(:,:,:)
+                integer(2), allocatable :: rms_final_weight(:)
+                integer(2), allocatable :: freq_cis_real(:,:)
+                integer(2), allocatable :: freq_cis_imag(:,:)
+                integer(2), allocatable :: wcls(:,:)
+
         end type TransformerWeights
 
         type Config
@@ -121,9 +139,27 @@ module arg_parse
 end module arg_parse
 
 program llama2 
+        use iso_c_binding
         use precision_module
         use weight_module
         use arg_parse
+
+        implicit none
+
+        interface
+                pure function float_to_half_c(x) bind(C, name="float_to_half")
+                        use iso_c_binding
+                        real(c_float), value :: x
+                        integer(c_int16_t) :: float_to_half_c
+                end function float_to_half_c
+
+                pure function half_to_float_c(h) bind(C, name="half_to_float")
+                        use iso_c_binding
+                        integer(c_int16_t), value :: h
+                        real(c_float) :: half_to_float_c
+                end function half_to_float_c
+        end interface
+
         
         ! weights and states
         INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
@@ -134,6 +170,7 @@ program llama2
         type(RunState) :: s
         real(kind=wp), allocatable :: logits(:)
         real(kind=wp), allocatable :: freq_buf(:)
+        real(kind=wp), allocatable :: temp1(:), temp2(:,:), temp3(:,:,:)
 
         !for the tokens
 
@@ -188,46 +225,111 @@ program llama2
                 end if 
 
                 ! once we know the config sizes, allocate the arrays
+                ! allocate temp, read in, convert to half precision
+                
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
+                allocate(temp2(emb_dim,vocab_size))
+                read(5) temp2
+                weights%token_embedding_table = v_float_to_half_c(temp2)
+                deallocate(temp2)
+                
                 allocate(weights%rms_att_weight(emb_dim,n_layers))
+                allocate(temp2(emb_dim,n_layers))
+                read(5) temp2
+                weights%rms_att_weight = v_float_to_half_c(temp2)
+                deallocate(temp2)
+
 
                 allocate(weights%wq(emb_dim,emb_dim,n_layers))
+                allocate(temp3(emb_dim,emb_dim,n_layers))
+                read(5) temp3
+                weights%wq = v_float_to_half_c(temp3)
+                !deallocate(temp3)
+
+
                 allocate(weights%wk(emb_dim,emb_dim,n_layers))
+                !allocate(temp3(emb_dim,emb_dim,n_layers))
+                read(5) temp3
+                weights%wk = v_float_to_half_c(temp3)
+                !deallocate(temp3)
+                
                 allocate(weights%wv(emb_dim,emb_dim,n_layers))
+                !allocate(temp3(emb_dim,emb_dim,n_layers))
+                read(5) temp3
+                weights%wv = v_float_to_half_c(temp3)
+                !deallocate(temp3)
+                
                 allocate(weights%wo(emb_dim,emb_dim,n_layers))
+                !allocate(temp3(emb_dim,emb_dim,n_layers))
+                read(5) temp3
+                weights%wo = v_float_to_half_c(temp3)
+                deallocate(temp3)
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
+                allocate(temp2(emb_dim,n_layers))
+                read(5) temp2
+                weights%rms_ffn_weight = v_float_to_half_c(temp2)
+                deallocate(temp2)
 
                 allocate(weights%w1(emb_dim,hidden_dim,n_layers))
+                allocate(temp3(emb_dim,hidden_dim,n_layers))
+                read(5) temp3
+                weights%w1 = v_float_to_half_c(temp3)
+                deallocate(temp3)
+
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
+                allocate(temp3(hidden_dim,emb_dim,n_layers))
+                read(5) temp3
+                weights%w2 = v_float_to_half_c(temp3)
+                deallocate(temp3)
+
                 allocate(weights%w3(emb_dim,hidden_dim,n_layers))
+                allocate(temp3(emb_dim,hidden_dim,n_layers))
+                read(5) temp3
+                weights%w3 = v_float_to_half_c(temp3)
+                deallocate(temp3)
 
                 allocate(weights%rms_final_weight(emb_dim))
+                allocate(temp1(emb_dim))
+                read(5) temp1
+                weights%rms_final_weight = v_float_to_half_c(temp1)
+                deallocate(temp1)
 
                 head_size = emb_dim / n_heads
 
                 allocate(weights%freq_cis_real(head_size/2,seq_len))
+                allocate(temp2(head_size/2,seq_len))
+                read(5) temp2
+                weights%freq_cis_real = v_float_to_half_c(temp2)
+                ! deallocate(temp2)
+                
                 allocate(weights%freq_cis_imag(head_size/2,seq_len))
-
+                !allocate(temp2(head_size/2,seq_len))
+                read(5) temp2
+                weights%freq_cis_imag = v_float_to_half_c(temp2)
+                deallocate(temp2)
 
                 ! read everything in
-                read(5) weights%token_embedding_table
-                read(5) weights%rms_att_weight
-                read(5) weights%wq
-                read(5) weights%wk
-                read(5) weights%wv
-                read(5) weights%wo
-                read(5) weights%rms_ffn_weight
-                read(5) weights%w1
-                read(5) weights%w2
-                read(5) weights%w3
-                read(5) weights%rms_final_weight
-                read(5) weights%freq_cis_real
-                read(5) weights%freq_cis_imag
+                !read(5) weights%token_embedding_table
+                !read(5) weights%rms_att_weight
+                !read(5) weights%wq
+                !read(5) weights%wk
+                !read(5) weights%wv
+                !read(5) weights%wo
+                !read(5) weights%rms_ffn_weight
+                !read(5) weights%w1
+                !read(5) weights%w2
+                !read(5) weights%w3
+                !read(5) weights%rms_final_weight
+                !read(5) weights%freq_cis_real
+                !read(5) weights%freq_cis_imag
 
                 if (.not. shared_weights) then
                         allocate(weights%wcls(emb_dim,vocab_size))
-                        read(5) weights%wcls
+                        allocate(temp2(emb_dim,vocab_size))
+                        read(5) temp2
+                        weights%wcls = v_float_to_half_c(temp2)
+                        deallocate(temp2)
                 end if
 
         close(5) 
@@ -285,7 +387,7 @@ program llama2
 
         ! __main__ part
         ! argparse
-        num_args = command_argument_count()
+        !num_args = command_argument_count()
 
 
         temperature = arg_values%temperature
@@ -341,6 +443,19 @@ program llama2
 ! functions 
 contains 
 
+        elemental pure function v_half_to_float_c(h) 
+                integer(2), intent(in) :: h
+                real(kind=wp) :: v_half_to_float_c
+                v_half_to_float_c = half_to_float_c(h)
+        end function
+
+        elemental pure function v_float_to_half_c(r)
+                real(kind=wp), intent(in) :: r
+                integer(2) :: v_float_to_half_c
+                v_float_to_half_c = float_to_half_c(r)
+        end function
+        
+        
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
                 call cpu_time(t_ms)
@@ -435,19 +550,20 @@ contains
 
                 logits(:) = 0
 
-                x = w%token_embedding_table(:,token)
+                ! convert precision        
+                x = v_half_to_float_c(w%token_embedding_table(:,token))
 
-                freq_cis_real_row = w%freq_cis_real(:,pos)
-                freq_cis_imag_row = w%freq_cis_imag(:,pos)
+                freq_cis_real_row = v_half_to_float_c(w%freq_cis_real(:,pos))
+                freq_cis_imag_row = v_half_to_float_c(w%freq_cis_imag(:,pos))
 
                 do l = 1,p%n_layers
                         
                         ! embed and project
-                        xb = rmsnorm(x,w%rms_att_weight(:,l)) 
+                        xb = rmsnorm(x,v_half_to_float_c(w%rms_att_weight(:,l))) 
         
-                        q = matmul(xb,w%wq(:,:,l))
-                        k = matmul(xb,w%wk(:,:,l))
-                        v = matmul(xb,w%wv(:,:,l))
+                        q = matmul(xb,v_half_to_float_c(w%wq(:,:,l)))
+                        k = matmul(xb,v_half_to_float_c(w%wk(:,:,l)))
+                        v = matmul(xb,v_half_to_float_c(w%wv(:,:,l)))
        
                         ! position encoding
         
@@ -501,31 +617,31 @@ contains
                         end do  
 
 
-                        x = x + matmul(xb, w%wo(:,:,l))
+                        x = x + matmul(xb, v_half_to_float_c(w%wo(:,:,l)))
 
-                        xb = rmsnorm(x,w%rms_ffn_weight(:,l))
+                        xb = rmsnorm(x,v_half_to_float_c(w%rms_ffn_weight(:,l)))
           
 
-                        hb = matmul(xb,w%w1(:,:,l))
-                        hb2 = matmul(xb,w%w3(:,:,l))
+                        hb = matmul(xb,v_half_to_float_c(w%w1(:,:,l)))
+                        hb2 = matmul(xb,v_half_to_float_c(w%w3(:,:,l)))
 
                         hb = hb*(1/(1+exp(-hb)))
 
                         hb = hb*hb2
-                        xb = matmul(hb,w%w2(:,:,l))
+                        xb = matmul(hb,v_half_to_float_c(w%w2(:,:,l)))
 
                         x = x + xb
 
                 end do
 
-                x = rmsnorm(x, w%rms_final_weight)
+                x = rmsnorm(x, v_half_to_float_c(w%rms_final_weight))
 
       
       
                 if (shared_weights) then
-                        logits = matmul(x,w%token_embedding_table)
+                        logits = matmul(x,v_half_to_float_c(w%token_embedding_table))
                 else
-                        logits = matmul(x,w%wcls)
+                        logits = matmul(x,v_half_to_float_c(w%wcls))
                 end if
 
         end function

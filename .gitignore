@@ -1,3 +1,4 @@
 llm
 *.bin
 *.mod
+*.o
