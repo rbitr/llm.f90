@@ -110,6 +110,7 @@ module arg_parse
                                                 i = i + 1
                                                 case default
                                                 print *, 'Unrecognized option:', trim(arg)
+                                                i = i + 1
                                                 end select
                         end do
 
