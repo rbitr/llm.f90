@@ -70,6 +70,9 @@ case ('-m', '--model')
 case ('-p', '--prompt')
 ! prompt string
 --
+case ('-s', '--tokenizer')
+! path to custom tokenizer
+--
 case ('-t', '--temperature')
 ! temperature scaling
 --
