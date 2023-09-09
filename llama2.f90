@@ -452,6 +452,34 @@ program llama2
 ! functions 
 contains 
 
+        function vm_matmul(a,b) result(c)
+                real(kind=wp) :: a(:)
+                real(kind=wp) :: b(:,:)
+                integer, allocatable :: s(:)
+                real(kind=wp), allocatable :: c(:)
+                integer :: i,j
+                real(kind=wp) :: val
+
+                s = shape(b)
+                allocate(c(s(2)))
+                c (:) = 0
+
+                do i=1,s(2)
+                        val = 0.0
+                        !!$OMP PARALLEL DO PRIVATE(j) REDUCTION(+:val)
+                        do j=1,size(a)
+                                val = val + a(j)*b(j,i)
+                        end do
+                        !!$OMP END PARALLEL DO
+                        c(i) = val
+
+                end do
+
+
+
+
+        end function
+
         !with loops
         function v_half_to_float_c(h)
                 integer(2), intent(in) :: h(:)
@@ -616,9 +644,9 @@ contains
                         ! embed and project
                         xb = rmsnorm(x,v_half_to_float_c(w%rms_att_weight(:,l))) 
         
-                        q = matmul(xb,v_half_to_float_c2(w%wq(:,:,l)))
-                        k = matmul(xb,v_half_to_float_c2(w%wk(:,:,l)))
-                        v = matmul(xb,v_half_to_float_c2(w%wv(:,:,l)))
+                        q = vm_matmul(xb,v_half_to_float_c2(w%wq(:,:,l)))
+                        k = vm_matmul(xb,v_half_to_float_c2(w%wk(:,:,l)))
+                        v = vm_matmul(xb,v_half_to_float_c2(w%wv(:,:,l)))
        
                         ! position encoding
         
@@ -672,18 +700,18 @@ contains
                         end do  
 
 
-                        x = x + matmul(xb, v_half_to_float_c2(w%wo(:,:,l)))
+                        x = x + vm_matmul(xb, v_half_to_float_c2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,v_half_to_float_c(w%rms_ffn_weight(:,l)))
           
 
-                        hb = matmul(xb,v_half_to_float_c2(w%w1(:,:,l)))
-                        hb2 = matmul(xb,v_half_to_float_c2(w%w3(:,:,l)))
+                        hb = vm_matmul(xb,v_half_to_float_c2(w%w1(:,:,l)))
+                        hb2 = vm_matmul(xb,v_half_to_float_c2(w%w3(:,:,l)))
 
                         hb = hb*(1/(1+exp(-hb)))
 
                         hb = hb*hb2
-                        xb = matmul(hb,v_half_to_float_c2(w%w2(:,:,l)))
+                        xb = vm_matmul(hb,v_half_to_float_c2(w%w2(:,:,l)))
 
                         x = x + xb
 
@@ -694,9 +722,9 @@ contains
       
       
                 if (shared_weights) then
-                        logits = matmul(x,v_half_to_float_c2(w%token_embedding_table))
+                        logits = vm_matmul(x,v_half_to_float_c2(w%token_embedding_table))
                 else
-                        logits = matmul(x,v_half_to_float_c2(w%wcls))
+                        logits = vm_matmul(x,v_half_to_float_c2(w%wcls))
                 end if
 
         end function
