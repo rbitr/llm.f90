@@ -143,6 +143,7 @@ program llama2
         use precision_module
         use weight_module
         use arg_parse
+        use omp_lib
 
         implicit none
 
@@ -230,63 +231,67 @@ program llama2
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
                 allocate(temp2(emb_dim,vocab_size))
                 read(5) temp2
-                weights%token_embedding_table = v_float_to_half_c(temp2)
+                weights%token_embedding_table = v_float_to_half_c2(temp2)
                 deallocate(temp2)
                 
+                if (verbose) then
+                        print *, "loaded embedding weights:", size(weights%token_embedding_table)
+                end if 
+
                 allocate(weights%rms_att_weight(emb_dim,n_layers))
                 allocate(temp2(emb_dim,n_layers))
                 read(5) temp2
-                weights%rms_att_weight = v_float_to_half_c(temp2)
+                weights%rms_att_weight = v_float_to_half_c2(temp2)
                 deallocate(temp2)
 
 
                 allocate(weights%wq(emb_dim,emb_dim,n_layers))
                 allocate(temp3(emb_dim,emb_dim,n_layers))
                 read(5) temp3
-                weights%wq = v_float_to_half_c(temp3)
+                weights%wq = v_float_to_half_c3(temp3)
                 !deallocate(temp3)
 
 
                 allocate(weights%wk(emb_dim,emb_dim,n_layers))
                 !allocate(temp3(emb_dim,emb_dim,n_layers))
                 read(5) temp3
-                weights%wk = v_float_to_half_c(temp3)
+                weights%wk = v_float_to_half_c3(temp3)
                 !deallocate(temp3)
                 
                 allocate(weights%wv(emb_dim,emb_dim,n_layers))
                 !allocate(temp3(emb_dim,emb_dim,n_layers))
                 read(5) temp3
-                weights%wv = v_float_to_half_c(temp3)
+                weights%wv = v_float_to_half_c3(temp3)
                 !deallocate(temp3)
                 
                 allocate(weights%wo(emb_dim,emb_dim,n_layers))
                 !allocate(temp3(emb_dim,emb_dim,n_layers))
                 read(5) temp3
-                weights%wo = v_float_to_half_c(temp3)
+                weights%wo = v_float_to_half_c3(temp3)
                 deallocate(temp3)
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
                 allocate(temp2(emb_dim,n_layers))
                 read(5) temp2
-                weights%rms_ffn_weight = v_float_to_half_c(temp2)
+                weights%rms_ffn_weight = v_float_to_half_c2(temp2)
                 deallocate(temp2)
 
                 allocate(weights%w1(emb_dim,hidden_dim,n_layers))
                 allocate(temp3(emb_dim,hidden_dim,n_layers))
                 read(5) temp3
-                weights%w1 = v_float_to_half_c(temp3)
+                weights%w1 = v_float_to_half_c3(temp3)
                 deallocate(temp3)
 
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
                 allocate(temp3(hidden_dim,emb_dim,n_layers))
                 read(5) temp3
-                weights%w2 = v_float_to_half_c(temp3)
+                weights%w2 = v_float_to_half_c3(temp3)
                 deallocate(temp3)
 
                 allocate(weights%w3(emb_dim,hidden_dim,n_layers))
                 allocate(temp3(emb_dim,hidden_dim,n_layers))
                 read(5) temp3
-                weights%w3 = v_float_to_half_c(temp3)
+                weights%w3 = v_float_to_half_c3(temp3)
                 deallocate(temp3)
 
                 allocate(weights%rms_final_weight(emb_dim))
@@ -300,13 +305,13 @@ program llama2
                 allocate(weights%freq_cis_real(head_size/2,seq_len))
                 allocate(temp2(head_size/2,seq_len))
                 read(5) temp2
-                weights%freq_cis_real = v_float_to_half_c(temp2)
+                weights%freq_cis_real = v_float_to_half_c2(temp2)
                 ! deallocate(temp2)
                 
                 allocate(weights%freq_cis_imag(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
                 read(5) temp2
-                weights%freq_cis_imag = v_float_to_half_c(temp2)
+                weights%freq_cis_imag = v_float_to_half_c2(temp2)
                 deallocate(temp2)
 
                 ! read everything in
@@ -328,11 +333,15 @@ program llama2
                         allocate(weights%wcls(emb_dim,vocab_size))
                         allocate(temp2(emb_dim,vocab_size))
                         read(5) temp2
-                        weights%wcls = v_float_to_half_c(temp2)
+                        weights%wcls = v_float_to_half_c2(temp2)
                         deallocate(temp2)
                 end if
 
         close(5) 
+
+        if (verbose) then
+                print *, "Loaded weights"
+        end if
 
         ! config
         conf%emb_dim = emb_dim
@@ -443,23 +452,67 @@ program llama2
 ! functions 
 contains 
 
-        elemental pure function v_half_to_float_c(h) 
-                integer(2), intent(in) :: h
-                real(kind=wp) :: v_half_to_float_c
-                v_half_to_float_c = half_to_float_c(h)
+        !with loops
+        pure function v_half_to_float_c(h)
+                integer(2), intent(in) :: h(:)
+                real(kind=wp) :: v_half_to_float_c (size(h))
+                integer :: i
+                do concurrent (i=1:size(h))
+                v_half_to_float_c(i) = half_to_float_c(h(i))
+                end do 
+        end function
+        
+        pure function v_float_to_half_c(r)
+                real(kind=wp), intent(in) :: r(:)
+                integer(2) :: v_float_to_half_c (size(r))
+                integer :: i
+                do concurrent (i=1:size(r))
+                v_float_to_half_c(i) = float_to_half_c(r(i))
+                end do
         end function
 
-        elemental pure function v_float_to_half_c(r)
-                real(kind=wp), intent(in) :: r
-                integer(2) :: v_float_to_half_c
-                v_float_to_half_c = float_to_half_c(r)
+        pure function v_half_to_float_c2(h)
+                integer(2), intent(in) :: h(:,:)
+                real(kind=wp) :: v_half_to_float_c2(size(h,1), size(h,2))
+                !integer(2) :: g(size(h,1),size(h,2))
+                v_half_to_float_c2 = reshape(v_half_to_float_c(&
+                        &reshape(h, [size(h)])), [size(h,1), size(h,2)])
         end function
+
+        pure function v_float_to_half_c2(r)
+                real(kind=wp), intent(in) :: r(:,:)
+                integer(2) :: v_float_to_half_c2(size(r,1), size(r,2))
+                v_float_to_half_c2 = reshape(v_float_to_half_c(&
+                        &reshape(r, [size(r)])), [size(r,1), size(r,2)])
+        end function
+
+        pure function v_float_to_half_c3(r)
+                real(kind=wp), intent(in) :: r(:,:,:)
+                integer(2) :: v_float_to_half_c3(size(r,1), size(r,2), size(r,3))
+                v_float_to_half_c3 = reshape(v_float_to_half_c(&
+                        &reshape(r, [size(r)])), [size(r,1), size(r,2), size(r,3)])
+        end function
+
+
+        !elemental pure function v_half_to_float_c(h) 
+        !        integer(2), intent(in) :: h
+        !        real(kind=wp) :: v_half_to_float_c
+        !        v_half_to_float_c = half_to_float_c(h)
+        !end function
+
+        !elemental pure function v_float_to_half_c(r)
+        !        real(kind=wp), intent(in) :: r
+        !        integer(2) :: v_float_to_half_c
+        !        v_float_to_half_c = float_to_half_c(r)
+        !end function
         
         
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
-                call cpu_time(t_ms)
-                t_ms = t_ms * 1000
+                integer(4) :: ms
+                !call cpu_time(t_ms)
+                call system_clock(ms)
+                t_ms = real(ms)
         end function
 
 
@@ -561,9 +614,9 @@ contains
                         ! embed and project
                         xb = rmsnorm(x,v_half_to_float_c(w%rms_att_weight(:,l))) 
         
-                        q = matmul(xb,v_half_to_float_c(w%wq(:,:,l)))
-                        k = matmul(xb,v_half_to_float_c(w%wk(:,:,l)))
-                        v = matmul(xb,v_half_to_float_c(w%wv(:,:,l)))
+                        q = matmul(xb,v_half_to_float_c2(w%wq(:,:,l)))
+                        k = matmul(xb,v_half_to_float_c2(w%wk(:,:,l)))
+                        v = matmul(xb,v_half_to_float_c2(w%wv(:,:,l)))
        
                         ! position encoding
         
@@ -617,18 +670,18 @@ contains
                         end do  
 
 
-                        x = x + matmul(xb, v_half_to_float_c(w%wo(:,:,l)))
+                        x = x + matmul(xb, v_half_to_float_c2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,v_half_to_float_c(w%rms_ffn_weight(:,l)))
           
 
-                        hb = matmul(xb,v_half_to_float_c(w%w1(:,:,l)))
-                        hb2 = matmul(xb,v_half_to_float_c(w%w3(:,:,l)))
+                        hb = matmul(xb,v_half_to_float_c2(w%w1(:,:,l)))
+                        hb2 = matmul(xb,v_half_to_float_c2(w%w3(:,:,l)))
 
                         hb = hb*(1/(1+exp(-hb)))
 
                         hb = hb*hb2
-                        xb = matmul(hb,v_half_to_float_c(w%w2(:,:,l)))
+                        xb = matmul(hb,v_half_to_float_c2(w%w2(:,:,l)))
 
                         x = x + xb
 
@@ -639,9 +692,9 @@ contains
       
       
                 if (shared_weights) then
-                        logits = matmul(x,v_half_to_float_c(w%token_embedding_table))
+                        logits = matmul(x,v_half_to_float_c2(w%token_embedding_table))
                 else
-                        logits = matmul(x,v_half_to_float_c(w%wcls))
+                        logits = matmul(x,v_half_to_float_c2(w%wcls))
                 end if
 
         end function
