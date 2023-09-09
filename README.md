@@ -3,45 +3,37 @@ LLaMA2 model inference in Fortran
 
 ## Notice
 
-This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.c It's based on a version of the code circa July 28, 2023. The project has since become way more complicated.
+This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.c It was originally based on a version of the code circa July 28, 2023 and in partcular uses the model formats from that project.
+
+If you have trouble running anything or have comments, suggestions, feature requests, etc, please get in touch or open an issue.
 
 ## What
 
-LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results. It's a bit of a wall of code, but should make sense in the context of the ipython notebook linked below and the llama2.c project. 
+LLaMA2 type LLM inference architecture implemented as a single Fortran file. Runs the "toy" models from llama2.c as well as the bigger LLaMA models.
 
-I've since found out there are Fortran implementations of inference for various GPT models: https://github.com/certik/fastgpt 
+For Fortran implementations of inference for various GPT models see https://github.com/certik/fastgpt 
 
 ## Why
 
-I saw a discussion last week about Fotran and realized I had never used it and it looked interesting: https://news.ycombinator.com/item?id=37295144
+The future of LLM model inference (and foundation model inference generally) is in lightweight, dedicated programs, not further abstraction. llama.cpp and programs like it have emerged as better options compared to heavy python frameworks. The goal is to have simple source code that can be directly adapted or incorporated into a project as the inference layer.
 
-This seemed like a good way to learn and explore Fortran for machine learning type programming. 
+This started as a way to investigate what Fortran could bring to ML model inference, and so far I belive it compares very favorably. The intent now is to build out a more full featured program that can run models in competitive times and remain simple.
 
-See also https://github.com/rbitr/llama2.ipynb my implementation in python. Python was easier, Fortran was more fun!
+Advantages of Fortran for ML:
 
-## Impressions
-
-Things I liked:
-
+- compiled language
 - memory management
 - array slicing
-- intrinsics (higher level functions like `matmul`)
-- seemingly fast - with default compiler options, I get ~165 tokens/s with the 15M model from this implementation vs. 75 tokens/s from llama2.c on my 2021 Thinkpad. However, using OMP parallelization I get 250 tokens/s with llama2.c. 
-- fun
+- intrinsic functions like `matmul`
+- arguably an easier higher level language to work with vs C, if we can keep it simple
+- various parallelization options
+- easy to link in C code if needed
 
-Interesting things (I could be wrong about some):
+Progress so far:
 
-- 1 based indexing (and off-by one errors can have a very subtle impact on output)
-- column major arrays
-- fixed size strings in arrays
-- no native way to tell if a string has trailing spaces (important for tokenization)
-- all the variables declared at the top
-- trims matrix operation results to fit arrays? 
-- harder to find answers to questions
-- confusion about different standards; I think this is 2003 compliant
-- parallelization  
-
-Overall, I can see how Fortran is competitive with C for compiled ML applications that have lots of linear algebra and run naively on the cpu. It has the right intrinsic functions, handles memory more easily than C (though declarations are awkward) and handles arrays natively. It remains to be seen how easily it works with other accelerators (BLAS, etc). 
+- runs LLaMA style toy models and base models (tested up to 7B)
+- matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524
+- [sixteen bit quantization](https://github.com/rbitr/llama2.f90/tree/sixteen_bit). This is not optimized, it just stores the weights as 16-bit floats so that the models can use less memory overall. Runs a 3B model a 0.1 Tokens/s on my 2021 Thinkpad in < 8GB RAM. Compares (arguably) favorably with llama2.c that's reported to run the 7B model at .025 Tok/s on a M1 Airbook.
 
 ## How
 
@@ -57,10 +49,13 @@ cd llama2.f90
 wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
 # 42M parameter model
 wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
+# 110M parameter model 
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
 ``` 
 
 Compile (only tested with GNU Fortran on Ubuntu)
 ```bash
+# optimized: gfortran -O3 -march=native -ffast-math -funroll-loops llama2.f90 -o llm 
 gfortran llama2.f90 -o llm
 ```
 
@@ -177,4 +172,32 @@ $ ./llm -v -m ./<path>/llama2_7b_chat_ak.bin
 * "Die Kraftwerk AG ist ein wichtiger Energieversor 
  Inference time:    1056.36633      seconds
   0.242340162     tokens/second
+```
+
+## Quantized models
+
+The default model uses 32-bit reals and e.g needs almost 30GB to run the 7B model and will not run the 3B on my machine with 16GB RAM. The [sixteen_bit](https://github.com/rbitr/llama2.f90/tree/sixteen_bit) branch, still experimental, uses an [external](https://github.com/Maratyszcza/FP16/) C library to convert reals to 16-bit floats packed in Fortran `integer(2)`s. 
+
+To run the quanitized model, clone the FP16 repo, and edit the Makefile (in the llama2.f90/sixteen_bit branch) to point to the FP16 include directory. Then run
+
+```bash
+make llm
+```
+
+It uses OpenMP to parellelize the conversion from float32 to float16. In my experiments, it runs slower if the matmul loop is also parallelized. Run specifying the number of cores. 
+
+```bash
+OMP_NUM_THREADS=8 ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer_open3b.bin -n 32 -p "Sometimes when nobody is looking"
+ Embedding dimension:         3200
+ Hidden dimension:         8640
+ Layers:           26
+ Heads:           32
+ kv Heads:           32
+ Vocabulary Size:       -32000
+ Sequence Length:         2048
+ loaded embedding weights:   102400000
+ Loaded weights
+Sometimes when nobody is looking, I like to take a few minutes to look at the world around me. I like to look at the trees, the sky 
+ Inference time:    331.016022      seconds
+   9.66720656E-02 tokens/second
 ```
