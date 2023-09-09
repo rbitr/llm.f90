@@ -453,25 +453,27 @@ program llama2
 contains 
 
         !with loops
-        pure function v_half_to_float_c(h)
+        function v_half_to_float_c(h)
                 integer(2), intent(in) :: h(:)
                 real(kind=wp) :: v_half_to_float_c (size(h))
                 integer :: i
-                do concurrent (i=1:size(h))
+                !$OMP PARALLEL DO PRIVATE(i)
+                do i=1,size(h)
                 v_half_to_float_c(i) = half_to_float_c(h(i))
                 end do 
+                !$OMP END PARALLEL DO
         end function
         
         pure function v_float_to_half_c(r)
                 real(kind=wp), intent(in) :: r(:)
                 integer(2) :: v_float_to_half_c (size(r))
                 integer :: i
-                do concurrent (i=1:size(r))
+                do i = 1,size(r)
                 v_float_to_half_c(i) = float_to_half_c(r(i))
                 end do
         end function
 
-        pure function v_half_to_float_c2(h)
+        function v_half_to_float_c2(h)
                 integer(2), intent(in) :: h(:,:)
                 real(kind=wp) :: v_half_to_float_c2(size(h,1), size(h,2))
                 !integer(2) :: g(size(h,1),size(h,2))
