@@ -172,6 +172,9 @@ program llama2
         real(kind=wp), allocatable :: logits(:)
         real(kind=wp), allocatable :: freq_buf(:)
         real(kind=wp), allocatable :: temp1(:), temp2(:,:), temp3(:,:,:)
+        integer :: l
+        ! anything that has n_layers, load in one layer at a time
+        !, temp3(:,:,:)
 
         !for the tokens
 
@@ -244,31 +247,67 @@ program llama2
                 weights%rms_att_weight = v_float_to_half_c2(temp2)
                 deallocate(temp2)
 
+                if (verbose) then
+                        print *, "loaded rms att weights:", size(weights%rms_att_weight)
+                end if
+
 
                 allocate(weights%wq(emb_dim,emb_dim,n_layers))
-                allocate(temp3(emb_dim,emb_dim,n_layers))
-                read(5) temp3
-                weights%wq = v_float_to_half_c3(temp3)
-                !deallocate(temp3)
+                allocate(temp2(emb_dim,emb_dim))
+                do l = 1,n_layers
+                !allocate(temp2(emb_dim,emb_dim,n_layers))
+                read(5) temp2
+                weights%wq(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                !deallocate(temp2)
 
-
+                if (verbose) then
+                        print *, "loaded wq weights:", size(weights%wq)
+                end if
+                
                 allocate(weights%wk(emb_dim,emb_dim,n_layers))
-                !allocate(temp3(emb_dim,emb_dim,n_layers))
-                read(5) temp3
-                weights%wk = v_float_to_half_c3(temp3)
-                !deallocate(temp3)
+                !allocate(temp2(emb_dim,emb_dim))
+                do l = 1,n_layers
+                !allocate(temp2(emb_dim,emb_dim,n_layers))
+                read(5) temp2
+                weights%wk(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                !deallocate(temp2)
+
+
+                if (verbose) then
+                        print *, "loaded wk weights:", size(weights%wk)
+                end if
                 
                 allocate(weights%wv(emb_dim,emb_dim,n_layers))
-                !allocate(temp3(emb_dim,emb_dim,n_layers))
-                read(5) temp3
-                weights%wv = v_float_to_half_c3(temp3)
-                !deallocate(temp3)
+                !allocate(temp2(emb_dim,emb_dim))
+                do l = 1,n_layers
+                !allocate(temp2(emb_dim,emb_dim,n_layers))
+                read(5) temp2
+                weights%wv(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                !deallocate(temp2)
+
+        
+
+                if (verbose) then
+                        print *, "loaded wv weights:", size(weights%wv)
+                end if
                 
                 allocate(weights%wo(emb_dim,emb_dim,n_layers))
-                !allocate(temp3(emb_dim,emb_dim,n_layers))
-                read(5) temp3
-                weights%wo = v_float_to_half_c3(temp3)
-                deallocate(temp3)
+                !allocate(temp2(emb_dim,emb_dim))
+                do l = 1,n_layers
+                !allocate(temp2(emb_dim,emb_dim,n_layers))
+                read(5) temp2
+                weights%wo(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                deallocate(temp2)
+
+
+
+                if (verbose) then
+                        print *, "loaded wo weights:", size(weights%wo)
+                end if
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
                 allocate(temp2(emb_dim,n_layers))
@@ -276,29 +315,55 @@ program llama2
                 weights%rms_ffn_weight = v_float_to_half_c2(temp2)
                 deallocate(temp2)
 
+                if (verbose) then
+                        print *, "loaded rms ffn  weights:", size(weights%rms_ffn_weight)
+                end if
+
                 allocate(weights%w1(emb_dim,hidden_dim,n_layers))
-                allocate(temp3(emb_dim,hidden_dim,n_layers))
-                read(5) temp3
-                weights%w1 = v_float_to_half_c3(temp3)
-                deallocate(temp3)
+                allocate(temp2(emb_dim,hidden_dim))
+                do l = 1,n_layers
+                read(5) temp2
+                weights%w1(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                deallocate(temp2)
+
+                if (verbose) then
+                        print *, "loaded w1 weights:", size(weights%w1)
+                end if
 
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
-                allocate(temp3(hidden_dim,emb_dim,n_layers))
-                read(5) temp3
-                weights%w2 = v_float_to_half_c3(temp3)
-                deallocate(temp3)
+                allocate(temp2(hidden_dim,emb_dim))
+                do l = 1,n_layers
+                read(5) temp2
+                weights%w2(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                deallocate(temp2)
+
+                if (verbose) then
+                        print *, "loaded w2 weights:", size(weights%w2)
+                end if
 
                 allocate(weights%w3(emb_dim,hidden_dim,n_layers))
-                allocate(temp3(emb_dim,hidden_dim,n_layers))
-                read(5) temp3
-                weights%w3 = v_float_to_half_c3(temp3)
-                deallocate(temp3)
+                allocate(temp2(emb_dim,hidden_dim))
+                do l = 1,n_layers
+                read(5) temp2
+                weights%w3(:,:,l) = v_float_to_half_c2(temp2)
+                end do
+                deallocate(temp2)
+
+                if (verbose) then
+                        print *, "loaded w3 weights:", size(weights%w3)
+                end if
 
                 allocate(weights%rms_final_weight(emb_dim))
                 allocate(temp1(emb_dim))
                 read(5) temp1
                 weights%rms_final_weight = v_float_to_half_c(temp1)
                 deallocate(temp1)
+
+                if (verbose) then
+                        print *, "loaded rms_final weights:", size(weights%rms_final_weight)
+                end if
 
                 head_size = emb_dim / n_heads
 
@@ -307,12 +372,20 @@ program llama2
                 read(5) temp2
                 weights%freq_cis_real = v_float_to_half_c2(temp2)
                 ! deallocate(temp2)
+
+                if (verbose) then
+                        print *, "loaded freq cis real  weights:", size(weights%freq_cis_real)
+                end if
                 
                 allocate(weights%freq_cis_imag(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
                 read(5) temp2
                 weights%freq_cis_imag = v_float_to_half_c2(temp2)
                 deallocate(temp2)
+
+                if (verbose) then
+                        print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
+                end if
 
                 ! read everything in
                 !read(5) weights%token_embedding_table
@@ -335,6 +408,11 @@ program llama2
                         read(5) temp2
                         weights%wcls = v_float_to_half_c2(temp2)
                         deallocate(temp2)
+
+                        if (verbose) then
+                                print *, "loaded wcls weights:", size(weights%wcls)
+                        end if
+
                 end if
 
         close(5) 
