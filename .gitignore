@@ -3,3 +3,4 @@ llm
 *.mod
 models/*
 *.o
+massif*
