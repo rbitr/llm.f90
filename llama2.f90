@@ -12,23 +12,6 @@ module weight_module
         use precision_module
         implicit none
         private wp
-        !type TransformerWeights
-        !        real(kind=wp), allocatable :: token_embedding_table(:,:)
-        !        real(kind=wp), allocatable :: rms_att_weight(:,:)
-        !        real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-        !        real(kind=wp), allocatable :: wq(:,:,:)
-        !        real(kind=wp), allocatable :: wk(:,:,:)
-        !        real(kind=wp), allocatable :: wv(:,:,:)
-        !        real(kind=wp), allocatable :: wo(:,:,:)
-        !        real(kind=wp), allocatable :: w1(:,:,:)
-        !        real(kind=wp), allocatable :: w2(:,:,:)
-        !        real(kind=wp), allocatable :: w3(:,:,:)
-        !        real(kind=wp), allocatable :: rms_final_weight(:)
-        !        real(kind=wp), allocatable :: freq_cis_real(:,:)
-        !        real(kind=wp), allocatable :: freq_cis_imag(:,:)
-        !        real(kind=wp), allocatable :: wcls(:,:)
-  
-        !end type TransformerWeights
 
         type TransformerWeights
                 integer(2), allocatable :: token_embedding_table(:,:)
@@ -582,16 +565,27 @@ contains
         function v_half_to_float_c2(h)
                 integer(2), intent(in) :: h(:,:)
                 real(kind=wp) :: v_half_to_float_c2(size(h,1), size(h,2))
-                !integer(2) :: g(size(h,1),size(h,2))
-                v_half_to_float_c2 = reshape(v_half_to_float_c(&
-                        &reshape(h, [size(h)])), [size(h,1), size(h,2)])
+                integer :: i,j
+                !$OMP PARALLEL DO COLLAPSE (2)
+                do j = 1,size(h,2)
+                        do i = 1,size(h,1)
+                            v_half_to_float_c2(i,j) = half_to_float_c(h(i,j))
+                        end do
+                end do 
+                !$OMP END PARALLEL DO   
         end function
 
-        pure function v_float_to_half_c2(r)
+        function v_float_to_half_c2(r)
                 real(kind=wp), intent(in) :: r(:,:)
                 integer(2) :: v_float_to_half_c2(size(r,1), size(r,2))
-                v_float_to_half_c2 = reshape(v_float_to_half_c(&
-                        &reshape(r, [size(r)])), [size(r,1), size(r,2)])
+                integer :: i,j
+                !$OMP PARALLEL DO COLLAPSE (2)
+                do j = 1,size(r,2)
+                        do i = 1,size(r,1)
+                            v_float_to_half_c2(i,j) = float_to_half_c(r(i,j))
+                        end do
+                end do
+                !$OMP END PARALLEL DO
         end function
 
         pure function v_float_to_half_c3(r)
@@ -600,20 +594,6 @@ contains
                 v_float_to_half_c3 = reshape(v_float_to_half_c(&
                         &reshape(r, [size(r)])), [size(r,1), size(r,2), size(r,3)])
         end function
-
-
-        !elemental pure function v_half_to_float_c(h) 
-        !        integer(2), intent(in) :: h
-        !        real(kind=wp) :: v_half_to_float_c
-        !        v_half_to_float_c = half_to_float_c(h)
-        !end function
-
-        !elemental pure function v_float_to_half_c(r)
-        !        real(kind=wp), intent(in) :: r
-        !        integer(2) :: v_float_to_half_c
-        !        v_float_to_half_c = float_to_half_c(r)
-        !end function
-        
         
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
