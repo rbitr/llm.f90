@@ -33,7 +33,7 @@ Progress so far:
 
 - runs LLaMA style toy models and base models (tested up to 7B)
 - matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524
-- [sixteen bit quantization](https://github.com/rbitr/llama2.f90/tree/sixteen_bit). This is not optimized, it just stores the weights as 16-bit floats so that the models can use less memory overall. Runs a 3B model a 0.1 Tokens/s on my 2021 Thinkpad in < 8GB RAM. Compares (arguably) favorably with llama2.c that's reported to run the 7B model at .025 Tok/s on a M1 Airbook.
+- [sixteen bit quantization](https://github.com/rbitr/llama2.f90/tree/sixteen_bit). This is not optimized, it just stores the weights as 16-bit floats so that the models can use less memory overall. Runs a 3B model a ~~0.1~~ 0.23 Tokens/s on my 2021 Thinkpad in < 8GB RAM. Compares (arguably) favorably with llama2.c that's reported to run the 7B model at .025 Tok/s on a M1 Airbook.
 
 ## How
 
@@ -187,10 +187,10 @@ To run the quanitized model, clone the FP16 repo, and edit the Makefile (in the 
 make llm
 ```
 
-It uses OpenMP to parellelize the conversion from float32 to float16. In my experiments, it runs slower if the matmul loop is also parallelized. Run specifying the number of cores. 
+It uses OpenMP to parellelize the conversion from float32 to float16. In my experiments, it runs slower if the matmul loop is also parallelized. 
 
 ```bash
-OMP_NUM_THREADS=8 ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer_open3b.bin -n 32 -p "Sometimes when nobody is looking"
+$ ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer_open3b.bin -n 32 -p "The \`git stash\` command" -t 0.9
  Embedding dimension:         3200
  Hidden dimension:         8640
  Layers:           26
@@ -199,8 +199,21 @@ OMP_NUM_THREADS=8 ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer
  Vocabulary Size:       -32000
  Sequence Length:         2048
  loaded embedding weights:   102400000
+ loaded rms att weights:       83200
+ loaded wq weights:   266240000
+ loaded wk weights:   266240000
+ loaded wv weights:   266240000
+ loaded wo weights:   266240000
+ loaded rms ffn  weights:       83200
+ loaded w1 weights:   718848000
+ loaded w2 weights:   718848000
+ loaded w3 weights:   718848000
+ loaded rms_final weights:        3200
+ loaded freq cis real  weights:      102400
+ loaded freq_cis_imag weights:      102400
+ loaded wcls weights:   102400000
  Loaded weights
-Sometimes when nobody is looking, I like to take a few minutes to look at the world around me. I like to look at the trees, the sky 
- Inference time:    331.016022      seconds
-   9.66720656E-02 tokens/second
+The `git stash` command can be used to move a local branch or any changes to the index or the working tree into a "stash". It 
+ Inference time:    136.256012      seconds
+  0.234852046     tokens/second
 ```
