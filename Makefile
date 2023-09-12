@@ -6,7 +6,7 @@ convert.o: convert.c
 	$(GCC) -c -O3 -I$(F16DIR) convert.c -lm
 
 llama2.o: llama2.f90
-	$(FORTRAN) -c -O3 -march=native -ffast-math -funroll-loops llama2.f90 -fopenmp
+	$(FORTRAN) -c -O3 -march=native -ffast-math -funroll-loops -fopenmp llama2.f90 
 
 llm: convert.o llama2.o
 	$(FORTRAN) convert.o llama2.o -fopenmp -o llm

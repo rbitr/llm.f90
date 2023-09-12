@@ -121,13 +121,20 @@ module arg_parse
 
 end module arg_parse
 
-program llama2 
-        use iso_c_binding
-        use precision_module
-        use weight_module
-        use arg_parse
-        use omp_lib
+!module lookup
+!
+!        real :: f32_lookup_table(-32768:32766)
+!
+!        contains 
+!                
+!                subroutine build_f32_lookup_table
+!
+!                end subroutine
+!
+!end module lookup
 
+module f32_convert
+        use iso_c_binding
         implicit none
 
         interface
@@ -143,6 +150,45 @@ program llama2
                         real(c_float) :: half_to_float_c
                 end function half_to_float_c
         end interface
+
+        real :: f32_lookup_table(-32768:32766)
+        integer(2) :: v
+
+        contains
+
+                subroutine build_f32_lookup_table
+                        do v = -32768,32766
+                        f32_lookup_table(v) = half_to_float_c(v)
+                        end do
+        
+                end subroutine
+
+end module f32_convert
+
+program llama2 
+        use iso_c_binding
+        use precision_module
+        use weight_module
+        use arg_parse
+        use omp_lib
+        use f32_convert, only: float_to_half_c, half_to_float_c, build_f32_lookup_table,&
+                &f32_lookup_table
+
+        implicit none
+
+        !interface
+        !        pure function float_to_half_c(x) bind(C, name="float_to_half")
+        !                use iso_c_binding
+        !                real(c_float), value :: x
+        !                integer(c_int16_t) :: float_to_half_c
+        !        end function float_to_half_c
+        !
+        !        pure function half_to_float_c(h) bind(C, name="half_to_float")
+        !                use iso_c_binding
+        !                integer(c_int16_t), value :: h
+        !                real(c_float) :: half_to_float_c
+        !        end function half_to_float_c
+        !end interface
 
         
         ! weights and states
@@ -456,9 +502,9 @@ program llama2
         close(5)
 
         ! __main__ part
-        ! argparse
-        !num_args = command_argument_count()
 
+        ! build lookup table
+        call build_f32_lookup_table
 
         temperature = arg_values%temperature
         prompt = arg_values%prompt
@@ -554,7 +600,18 @@ contains
                 end do 
                 !$OMP END PARALLEL DO
         end function
-        
+       
+        function v_half_to_float_lookup(h)
+                integer(2), intent(in) :: h(:)
+                real(kind=wp) :: v_half_to_float_lookup (size(h))
+                integer :: i
+                !$OMP PARALLEL DO PRIVATE(i)
+                do i=1,size(h)
+                v_half_to_float_lookup(i) = f32_lookup_table(h(i))
+                end do
+                !$OMP END PARALLEL DO
+        end function
+
         pure function v_float_to_half_c(r)
                 real(kind=wp), intent(in) :: r(:)
                 integer(2) :: v_float_to_half_c (size(r))
@@ -576,6 +633,21 @@ contains
                 end do 
                 !$OMP END PARALLEL DO   
         end function
+
+        function v_half_to_float_lookup2(h)
+                integer(2), intent(in) :: h(:,:)
+                real(kind=wp) :: v_half_to_float_lookup2(size(h,1), size(h,2))
+                integer :: i,j
+                !$OMP PARALLEL DO COLLAPSE (2)
+                do j = 1,size(h,2)
+                        do i = 1,size(h,1)
+                            v_half_to_float_lookup2(i,j) = f32_lookup_table(h(i,j))
+                        end do
+                end do
+                !$OMP END PARALLEL DO   
+        end function
+
+
 
         function v_float_to_half_c2(r)
                 real(kind=wp), intent(in) :: r(:,:)
@@ -694,7 +766,7 @@ contains
                 logits(:) = 0
 
                 ! convert precision        
-                x = v_half_to_float_c(w%token_embedding_table(:,token))
+                x = v_half_to_float_lookup(w%token_embedding_table(:,token))
 
                 freq_cis_real_row = v_half_to_float_c(w%freq_cis_real(:,pos))
                 freq_cis_imag_row = v_half_to_float_c(w%freq_cis_imag(:,pos))
@@ -702,11 +774,11 @@ contains
                 do l = 1,p%n_layers
                         
                         ! embed and project
-                        xb = rmsnorm(x,v_half_to_float_c(w%rms_att_weight(:,l))) 
+                        xb = rmsnorm(x,v_half_to_float_lookup(w%rms_att_weight(:,l))) 
         
-                        q = vm_matmul(xb,v_half_to_float_c2(w%wq(:,:,l)))
-                        k = vm_matmul(xb,v_half_to_float_c2(w%wk(:,:,l)))
-                        v = vm_matmul(xb,v_half_to_float_c2(w%wv(:,:,l)))
+                        q = vm_matmul(xb,v_half_to_float_lookup2(w%wq(:,:,l)))
+                        k = vm_matmul(xb,v_half_to_float_lookup2(w%wk(:,:,l)))
+                        v = vm_matmul(xb,v_half_to_float_lookup2(w%wv(:,:,l)))
        
                         ! position encoding
         
@@ -760,31 +832,31 @@ contains
                         end do  
 
 
-                        x = x + vm_matmul(xb, v_half_to_float_c2(w%wo(:,:,l)))
+                        x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
-                        xb = rmsnorm(x,v_half_to_float_c(w%rms_ffn_weight(:,l)))
+                        xb = rmsnorm(x,v_half_to_float_lookup(w%rms_ffn_weight(:,l)))
           
 
-                        hb = vm_matmul(xb,v_half_to_float_c2(w%w1(:,:,l)))
-                        hb2 = vm_matmul(xb,v_half_to_float_c2(w%w3(:,:,l)))
+                        hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
+                        hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
 
                         hb = hb*(1/(1+exp(-hb)))
 
                         hb = hb*hb2
-                        xb = vm_matmul(hb,v_half_to_float_c2(w%w2(:,:,l)))
+                        xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
 
                         x = x + xb
 
                 end do
 
-                x = rmsnorm(x, v_half_to_float_c(w%rms_final_weight))
+                x = rmsnorm(x, v_half_to_float_lookup(w%rms_final_weight))
 
       
       
                 if (shared_weights) then
-                        logits = vm_matmul(x,v_half_to_float_c2(w%token_embedding_table))
+                        logits = vm_matmul(x,v_half_to_float_lookup2(w%token_embedding_table))
                 else
-                        logits = vm_matmul(x,v_half_to_float_c2(w%wcls))
+                        logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
                 end if
 
         end function
