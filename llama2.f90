@@ -15,8 +15,8 @@ module weight_module
 
         type TransformerWeights
                 integer(2), allocatable :: token_embedding_table(:,:)
-                integer(2), allocatable :: rms_att_weight(:,:)
-                integer(2), allocatable :: rms_ffn_weight(:,:)
+                real(kind=wp), allocatable :: rms_att_weight(:,:)
+                real(kind=wp), allocatable :: rms_ffn_weight(:,:)
                 integer(2), allocatable :: wq(:,:,:)
                 integer(2), allocatable :: wk(:,:,:)
                 integer(2), allocatable :: wv(:,:,:)
@@ -24,9 +24,9 @@ module weight_module
                 integer(2), allocatable :: w1(:,:,:)
                 integer(2), allocatable :: w2(:,:,:)
                 integer(2), allocatable :: w3(:,:,:)
-                integer(2), allocatable :: rms_final_weight(:)
-                integer(2), allocatable :: freq_cis_real(:,:)
-                integer(2), allocatable :: freq_cis_imag(:,:)
+                real(kind=wp), allocatable :: rms_final_weight(:)
+                real(kind=wp), allocatable :: freq_cis_real(:,:)
+                real(kind=wp), allocatable :: freq_cis_imag(:,:)
                 integer(2), allocatable :: wcls(:,:)
 
         end type TransformerWeights
@@ -247,10 +247,10 @@ program llama2
                 end if 
 
                 allocate(weights%rms_att_weight(emb_dim,n_layers))
-                allocate(temp2(emb_dim,n_layers))
-                read(5) temp2
-                weights%rms_att_weight = v_float_to_half_c2(temp2)
-                deallocate(temp2)
+                !allocate(temp2(emb_dim,n_layers))
+                read(5) weights%rms_att_weight
+                !weights%rms_att_weight = v_float_to_half_c2(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded rms att weights:", size(weights%rms_att_weight)
@@ -315,10 +315,10 @@ program llama2
                 end if
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
-                allocate(temp2(emb_dim,n_layers))
-                read(5) temp2
-                weights%rms_ffn_weight = v_float_to_half_c2(temp2)
-                deallocate(temp2)
+                !allocate(temp2(emb_dim,n_layers))
+                read(5) weights%rms_ffn_weight
+                !weights%rms_ffn_weight = v_float_to_half_c2(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded rms ffn  weights:", size(weights%rms_ffn_weight)
@@ -361,10 +361,10 @@ program llama2
                 end if
 
                 allocate(weights%rms_final_weight(emb_dim))
-                allocate(temp1(emb_dim))
-                read(5) temp1
-                weights%rms_final_weight = v_float_to_half_c(temp1)
-                deallocate(temp1)
+                !allocate(temp1(emb_dim))
+                read(5) weights%rms_final_weight
+                !weights%rms_final_weight = v_float_to_half_c(temp1)
+                !deallocate(temp1)
 
                 if (verbose) then
                         print *, "loaded rms_final weights:", size(weights%rms_final_weight)
@@ -373,9 +373,9 @@ program llama2
                 head_size = emb_dim / n_heads
 
                 allocate(weights%freq_cis_real(head_size/2,seq_len))
-                allocate(temp2(head_size/2,seq_len))
-                read(5) temp2
-                weights%freq_cis_real = v_float_to_half_c2(temp2)
+                !allocate(temp2(head_size/2,seq_len))
+                read(5) weights%freq_cis_real
+                !weights%freq_cis_real = v_float_to_half_c2(temp2)
                 ! deallocate(temp2)
 
                 if (verbose) then
@@ -384,9 +384,9 @@ program llama2
                 
                 allocate(weights%freq_cis_imag(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
-                read(5) temp2
-                weights%freq_cis_imag = v_float_to_half_c2(temp2)
-                deallocate(temp2)
+                read(5) weights%freq_cis_imag
+                !weights%freq_cis_imag = v_float_to_half_c2(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
@@ -744,13 +744,13 @@ contains
                 ! convert precision        
                 x = v_half_to_float_lookup(w%token_embedding_table(:,token))
 
-                freq_cis_real_row = v_half_to_float_c(w%freq_cis_real(:,pos))
-                freq_cis_imag_row = v_half_to_float_c(w%freq_cis_imag(:,pos))
+                freq_cis_real_row = w%freq_cis_real(:,pos)
+                freq_cis_imag_row = w%freq_cis_imag(:,pos)
 
                 do l = 1,p%n_layers
                         
                         ! embed and project
-                        xb = rmsnorm(x,v_half_to_float_lookup(w%rms_att_weight(:,l))) 
+                        xb = rmsnorm(x,w%rms_att_weight(:,l))
         
                         q = vm_matmul(xb,v_half_to_float_lookup2(w%wq(:,:,l)))
                         k = vm_matmul(xb,v_half_to_float_lookup2(w%wk(:,:,l)))
@@ -810,7 +810,7 @@ contains
 
                         x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
-                        xb = rmsnorm(x,v_half_to_float_lookup(w%rms_ffn_weight(:,l)))
+                        xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
 
                         hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
@@ -825,7 +825,7 @@ contains
 
                 end do
 
-                x = rmsnorm(x, v_half_to_float_lookup(w%rms_final_weight))
+                x = rmsnorm(x, w%rms_final_weight)
 
       
       
