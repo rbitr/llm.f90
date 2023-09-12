@@ -525,6 +525,7 @@ contains
                 allocate(c(s(2)))
                 c (:) = 0
 
+                !$OMP PARALLEL DO
                 do i=1,s(2)
                         val = 0.0
                         !!$OMP PARALLEL DO PRIVATE(j) REDUCTION(+:val)
@@ -535,6 +536,7 @@ contains
                         c(i) = val
 
                 end do
+                !$OMP END PARALLEL DO
 
 
 
