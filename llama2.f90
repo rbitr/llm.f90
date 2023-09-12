@@ -121,17 +121,6 @@ module arg_parse
 
 end module arg_parse
 
-!module lookup
-!
-!        real :: f32_lookup_table(-32768:32766)
-!
-!        contains 
-!                
-!                subroutine build_f32_lookup_table
-!
-!                end subroutine
-!
-!end module lookup
 
 module f32_convert
         use iso_c_binding
@@ -176,19 +165,6 @@ program llama2
 
         implicit none
 
-        !interface
-        !        pure function float_to_half_c(x) bind(C, name="float_to_half")
-        !                use iso_c_binding
-        !                real(c_float), value :: x
-        !                integer(c_int16_t) :: float_to_half_c
-        !        end function float_to_half_c
-        !
-        !        pure function half_to_float_c(h) bind(C, name="half_to_float")
-        !                use iso_c_binding
-        !                integer(c_int16_t), value :: h
-        !                real(c_float) :: half_to_float_c
-        !        end function half_to_float_c
-        !end interface
 
         
         ! weights and states
