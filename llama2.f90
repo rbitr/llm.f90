@@ -529,7 +529,7 @@ program llama2
         t_ms_end = time_ms()
         print *,""
         print *, "Inference time: ", (t_ms_end-t_ms_start)/1000, " seconds" 
-        print *, 1000*seq_len/(t_ms_end-t_ms_start), "tokens/second"
+        print *, 1000*(seq_len-1)/(t_ms_end-t_ms_start), "tokens/second"
         ! end of __main__       
 
 ! functions 
@@ -782,6 +782,7 @@ contains
                         xb(:) = 0
                         
                         ! multi head attention and fc layers
+                        !$OMP PARALLEL DO PRIVATE(h, q_t, k_t, xbh, t, v_t, a)
                         do h = 0,(p%n_heads-1)        
                         ! alternately uncomment below to make explicitly concurrent 
                         !do concurrent (h =1:(p%n_heads-1))
@@ -806,6 +807,7 @@ contains
                         xb((h*head_size+1):((h+1)*head_size)) = xbh
                        
                         end do  
+                        !$OMP END PARALLEL DO
 
 
                         x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
