@@ -33,7 +33,7 @@ Progress so far:
 
 - runs LLaMA style toy models and base models (tested up to 7B)
 - original implementation matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524 It should be faster now as more has been parallelized
-- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ 0.8 Tokens/s on my 2021 Thinkpad in < 8GB RAM. "Fast"(er) handling of quantization through parallelization and lookup. 
+- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ ~~0.8~~ 2.5 Tokens/s on my 2021 Thinkpad in < 8GB RAM (still in the sixteen_bit branch). "Fast"(er) handling of quantization through parallelization and lookup. 
 - Speed improvements over original implementation from parallelizing much of the inference process (by grouping operations and then parallelizing with OpenMP)
 
 ## How
