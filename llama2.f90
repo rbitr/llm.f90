@@ -393,20 +393,6 @@ program llama2
                         print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
                 end if
 
-                ! read everything in
-                !read(5) weights%token_embedding_table
-                !read(5) weights%rms_att_weight
-                !read(5) weights%wq
-                !read(5) weights%wk
-                !read(5) weights%wv
-                !read(5) weights%wo
-                !read(5) weights%rms_ffn_weight
-                !read(5) weights%w1
-                !read(5) weights%w2
-                !read(5) weights%w3
-                !read(5) weights%rms_final_weight
-                !read(5) weights%freq_cis_real
-                !read(5) weights%freq_cis_imag
 
                 if (.not. shared_weights) then
                         allocate(weights%wcls(emb_dim,vocab_size))
@@ -541,6 +527,7 @@ program llama2
 ! functions 
 contains 
 
+        ! group the matmuls from MLP layers + nonlinearity together
         function p_mlp(xb,row,l, w) result(hb)
                 real(kind=wp) :: xb(:)
                 type(TransformerWeights), intent(in) :: w
@@ -551,14 +538,13 @@ contains
                 hb = dot_product(xb,temp)
                 temp = v_half_to_float_lookup(w%w3(:,row,l))
                 hb2 = dot_product(xb,temp)
-                !hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
-                !hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
 
                 hb = hb*(1/(1+exp(-hb)))
 
                 hb = hb*hb2
         end function
        
+        ! group up front projection matmuls
         function p_proj(xb,row,l,w) result(p)
                 real(kind=wp) :: xb(:)
                 type(TransformerWeights), intent(in) :: w
@@ -803,15 +789,14 @@ contains
                         ! embed and project
                         time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
+                        !$OMP PARALLEL DO PRIVATE(ix,proj)
                         do ix = 1,p%emb_dim
                         proj = p_proj(xb,ix,l,w)
                         q(ix) = proj(1)
                         k(ix) = proj(2)
                         v(ix) = proj(3)
                         end do
-                        !q = vm_matmul(xb,v_half_to_float_lookup2(w%wq(:,:,l)))
-                        !k = vm_matmul(xb,v_half_to_float_lookup2(w%wk(:,:,l)))
-                        !v = vm_matmul(xb,v_half_to_float_lookup2(w%wv(:,:,l)))
+                        !$OMP END PARALLEL DO
                         s%times(1) = s%times(1) + (time_ms()-time)
                         ! position encoding
         
@@ -875,19 +860,9 @@ contains
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
-                        !time = time_ms()
                         !$OMP PARALLEL DO PRIVATE(ix)
                         do ix = 1,p%hidden_dim
                         hb(ix) = p_mlp(xb,ix,l,w) 
-                        !hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
-                        !hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
-                        !
-                        !hb = hb*(1/(1+exp(-hb)))
-                        !
-                        !hb = hb*hb2
-                        !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
-                        !
-                        !x = x + xb
                         end do
                         !$OMP END PARALLEL DO
                         
