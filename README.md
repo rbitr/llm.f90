@@ -17,7 +17,7 @@ For Fortran implementations of inference for various GPT models see https://gith
 
 The future of LLM model inference (and foundation model inference generally) is in lightweight, dedicated programs, not further abstraction. llama.cpp and programs like it have emerged as better options compared to heavy python frameworks. The goal is to have simple source code that can be directly adapted or incorporated into a project as the inference layer.
 
-This started as a way to investigate what Fortran could bring to ML model inference, and so far I belive it compares very favorably. The intent now is to build out a more full featured program that can run models in competitive times and remain simple.
+This started as a way to investigate what Fortran could bring to ML model inference, and so far I believe it compares very favorably. The intent now is to build out a more full featured program that can run models in competitive times and remain simple.
 
 Advantages of Fortran for ML:
 
@@ -32,14 +32,17 @@ Advantages of Fortran for ML:
 Progress so far:
 
 - runs LLaMA style toy models and base models (tested up to 7B)
-- matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524
-- [sixteen bit quantization](https://github.com/rbitr/llama2.f90/tree/sixteen_bit). This is not optimized, it just stores the weights as 16-bit floats so that the models can use less memory overall. Runs a 3B model a ~~0.1~~ 0.23 Tokens/s on my 2021 Thinkpad in < 8GB RAM. Compares (arguably) favorably with llama2.c that's reported to run the 7B model at .025 Tok/s on a M1 Airbook.
+- original implementation matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524 It should be faster now as more has been parallelized
+- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ 0.8 Tokens/s on my 2021 Thinkpad in < 8GB RAM. "Fast"(er) handling of quantization through parallelization and lookup. 
+- Speed improvements over original implementation from parallelizing much of the inference process (by grouping operations and then parallelizing with OpenMP)
 
 ## How
 
 Clone the repo
 ```bash
 git clone https://github.com/rbitr/llama2.f90
+# also requires https://github.com/Maratyszcza/FP16/ for FP16
+# otherwise use the old_master branch
 ```
 
 Download the trained model from HF
@@ -55,8 +58,9 @@ wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
 
 Compile (only tested with GNU Fortran on Ubuntu)
 ```bash
-# optimized: gfortran -O3 -march=native -ffast-math -funroll-loops llama2.f90 -o llm 
-gfortran llama2.f90 -o llm
+# requires the FP16 code referenced above 
+# edit to select your appropriate compiler
+make llm
 ```
 
 Now supports some proper command line arguments
@@ -83,7 +87,7 @@ case ('-v', '--verbose')
 ! print additional information
 ```
 
-Run the model:
+Run the model (see the bottom for the latest example):
 
 
 ```bash
@@ -179,18 +183,10 @@ $ ./llm -v -m ./<path>/llama2_7b_chat_ak.bin
 
 ## Quantized models
 
-The default model uses 32-bit reals and e.g needs almost 30GB to run the 7B model and will not run the 3B on my machine with 16GB RAM. The [sixteen_bit](https://github.com/rbitr/llama2.f90/tree/sixteen_bit) branch, still experimental, uses an [external](https://github.com/Maratyszcza/FP16/) C library to convert reals to 16-bit floats packed in Fortran `integer(2)`s. 
-
-To run the quanitized model, clone the FP16 repo, and edit the Makefile (in the llama2.f90/sixteen_bit branch) to point to the FP16 include directory. Then run
+The original model used 32-bit reals and e.g needs almost 30GB to run the 7B model and will not run the 3B on my machine with 16GB RAM. The [sixteen_bit](https://github.com/rbitr/llama2.f90/tree/sixteen_bit) branch, has been merged into master and uses an [external](https://github.com/Maratyszcza/FP16/) C library to convert reals to 16-bit floats packed in Fortran `integer(2)`s. 
 
 ```bash
-make llm
-```
-
-It uses OpenMP to parellelize the conversion from float32 to float16. In my experiments, it runs slower if the matmul loop is also parallelized. 
-
-```bash
-$ ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer_open3b.bin -n 32 -p "The \`git stash\` command" -t 0.9
+$ ./llm -m ./models/open_llama_3b_v2_ak.bin -s ./models/tokenizer_open3b.bin -t 0.9 -v -n 64 -p "I stopped posting in knitting forums because"
  Embedding dimension:         3200
  Hidden dimension:         8640
  Layers:           26
@@ -213,7 +209,7 @@ $ ./llm -v -m models/open_llama_3b_v2_ak.bin -s models/tokenizer_open3b.bin -n 3
  loaded freq_cis_imag weights:      102400
  loaded wcls weights:   102400000
  Loaded weights
-The `git stash` command can be used to move a local branch or any changes to the index or the working tree into a "stash". It 
- Inference time:    136.256012      seconds
-  0.234852046     tokens/second
+I stopped posting in knitting forums because my babes were too young to appreciate my hobby. But until the last few months, I'd managed to avoid the Instant Pot threads. Why? Because I hadn't quite made the leap from the not-on-Cooking-Foibles-people-ra 
+ Inference time:    75.8880005      seconds
+  0.830170751     tokens/second
 ```
