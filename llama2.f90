@@ -40,6 +40,7 @@ module weight_module
                 real(kind=wp), allocatable :: att(:,:)
                 real(kind=wp), allocatable :: key_cache(:,:,:)
                 real(kind=wp), allocatable :: value_cache(:,:,:)
+                real(kind=wp) :: times(5)
 
         end type RunState
 
@@ -444,6 +445,7 @@ program llama2
         s%att(:,:) = 0
         s%key_cache(:,:,:) = 0
         s%value_cache(:,:,:) = 0
+        s%times = 0
 
         ! read in token vocab
         open(UNIT=5, FILE=arg_values%tokenizer, FORM="UNFORMATTED",&
@@ -530,10 +532,48 @@ program llama2
         print *,""
         print *, "Inference time: ", (t_ms_end-t_ms_start)/1000, " seconds" 
         print *, 1000*(seq_len-1)/(t_ms_end-t_ms_start), "tokens/second"
+        print *, "Timings"
+        do l = 1,5
+                print *, l, s%times(l)/seq_len
+        end do
         ! end of __main__       
 
 ! functions 
 contains 
+
+        function p_mlp(xb,row,l, w) result(hb)
+                real(kind=wp) :: xb(:)
+                type(TransformerWeights), intent(in) :: w
+                real(kind=wp) :: temp(size(xb))        
+                integer :: row, l
+                real(kind=wp) :: hb, hb2
+                temp = v_half_to_float_lookup(w%w1(:,row,l))
+                hb = dot_product(xb,temp)
+                temp = v_half_to_float_lookup(w%w3(:,row,l))
+                hb2 = dot_product(xb,temp)
+                !hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
+                !hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
+
+                hb = hb*(1/(1+exp(-hb)))
+
+                hb = hb*hb2
+        end function
+       
+        function p_proj(xb,row,l,w) result(p)
+                real(kind=wp) :: xb(:)
+                type(TransformerWeights), intent(in) :: w
+                real(kind=wp) :: temp(size(xb))
+                integer :: row, l
+                real(kind=wp) :: p(3)
+
+                temp = v_half_to_float_lookup(w%wq(:,row,l))
+                p(1) = dot_product(xb,temp)
+                temp = v_half_to_float_lookup(w%wk(:,row,l))
+                p(2) = dot_product(xb,temp)
+                temp = v_half_to_float_lookup(w%wv(:,row,l))
+                p(3) = dot_product(xb,temp)
+
+        end function
 
         function vm_matmul(a,b) result(c)
                 real(kind=wp) :: a(:)
@@ -686,6 +726,15 @@ contains
 
               xr = x*w/xn
         end function
+
+        function trmsnorm(x,w,xn) result(xr)
+              real(kind=wp) :: x, w
+              real(kind=wp) :: xr
+              real(kind=wp) :: xn
+              !xn = sqrt(dot_product(x,x)/size(x)+1e-5)
+
+              xr = x*w/xn
+        end function
       
         ! declared as "pure" for potentiall parallelization of heads
         pure function softmax(x,s) result (p)
@@ -715,6 +764,7 @@ contains
                 real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
                 ! embeddings
+                real(kind=wp) :: proj(3)
                 real(kind=wp) :: q(emb_dim)
                 real(kind=wp) :: k(emb_dim)
                 real(kind=wp) :: v(emb_dim)
@@ -734,7 +784,8 @@ contains
                 real(kind=wp) :: hb2(hidden_dim)
       
                 ! counters etc
-                integer :: l, i, h, t, head_size
+                integer :: l, i, h, t, head_size, ix
+                real(kind=wp) :: time
 
 
                 head_size = p%emb_dim/p%n_heads
@@ -750,14 +801,21 @@ contains
                 do l = 1,p%n_layers
                         
                         ! embed and project
+                        time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
-        
-                        q = vm_matmul(xb,v_half_to_float_lookup2(w%wq(:,:,l)))
-                        k = vm_matmul(xb,v_half_to_float_lookup2(w%wk(:,:,l)))
-                        v = vm_matmul(xb,v_half_to_float_lookup2(w%wv(:,:,l)))
-       
+                        do ix = 1,p%emb_dim
+                        proj = p_proj(xb,ix,l,w)
+                        q(ix) = proj(1)
+                        k(ix) = proj(2)
+                        v(ix) = proj(3)
+                        end do
+                        !q = vm_matmul(xb,v_half_to_float_lookup2(w%wq(:,:,l)))
+                        !k = vm_matmul(xb,v_half_to_float_lookup2(w%wk(:,:,l)))
+                        !v = vm_matmul(xb,v_half_to_float_lookup2(w%wv(:,:,l)))
+                        s%times(1) = s%times(1) + (time_ms()-time)
                         ! position encoding
         
+                        time = time_ms()
                         do h = 0,(p%n_heads-1)
                                 do i = 1,head_size,2
 
@@ -774,6 +832,7 @@ contains
           
                                 end do
                         end do
+                        s%times(2) = s%times(2) + (time_ms()-time)
 
                         ! cache k and v for this position
                         s%key_cache(:,pos,l) = k
@@ -782,6 +841,7 @@ contains
                         xb(:) = 0
                         
                         ! multi head attention and fc layers
+                        time = time_ms()
                         !$OMP PARALLEL DO PRIVATE(h, q_t, k_t, xbh, t, v_t, a)
                         do h = 0,(p%n_heads-1)        
                         ! alternately uncomment below to make explicitly concurrent 
@@ -808,25 +868,37 @@ contains
                        
                         end do  
                         !$OMP END PARALLEL DO
+                        s%times(3) = s%times(3) + (time_ms() - time)
 
-
+                        time = time_ms()
                         x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
-
-                        hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
-                        hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
-
-                        hb = hb*(1/(1+exp(-hb)))
-
-                        hb = hb*hb2
+                        !time = time_ms()
+                        !$OMP PARALLEL DO PRIVATE(ix)
+                        do ix = 1,p%hidden_dim
+                        hb(ix) = p_mlp(xb,ix,l,w) 
+                        !hb = vm_matmul(xb,v_half_to_float_lookup2(w%w1(:,:,l)))
+                        !hb2 = vm_matmul(xb,v_half_to_float_lookup2(w%w3(:,:,l)))
+                        !
+                        !hb = hb*(1/(1+exp(-hb)))
+                        !
+                        !hb = hb*hb2
+                        !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
+                        !
+                        !x = x + xb
+                        end do
+                        !$OMP END PARALLEL DO
+                        
                         xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
-
                         x = x + xb
+
+                        s%times(4) = s%times(4) + (time_ms() - time)
 
                 end do
 
+                time = time_ms()
                 x = rmsnorm(x, w%rms_final_weight)
 
       
@@ -836,6 +908,7 @@ contains
                 else
                         logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
                 end if
+                s%times(5) = s%times(5) + (time_ms() - time)
 
         end function
 
