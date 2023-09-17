@@ -13,28 +13,30 @@ LLaMA2 type LLM inference architecture implemented as a single Fortran file. Run
 
 For Fortran implementations of inference for various GPT models see https://github.com/certik/fastgpt 
 
-## Why
-
-The future of LLM model inference (and foundation model inference generally) is in lightweight, dedicated programs, not further abstraction. llama.cpp and programs like it have emerged as better options compared to heavy python frameworks. The goal is to have simple source code that can be directly adapted or incorporated into a project as the inference layer.
-
-This started as a way to investigate what Fortran could bring to ML model inference, and so far I believe it compares very favorably. The intent now is to build out a more full featured program that can run models in competitive times and remain simple.
-
-Advantages of Fortran for ML:
-
-- compiled language
-- memory management
-- array slicing
-- intrinsic functions like `matmul`
-- arguably an easier higher level language to work with vs C, if we can keep it simple
-- various parallelization options
-- easy to link in C code if needed
-
 Progress so far:
 
 - runs LLaMA style toy models and base models (tested up to 7B)
 - original implementation matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524 It should be faster now as more has been parallelized
-- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ 0.8 Tokens/s on my 2021 Thinkpad in < 8GB RAM. "Fast"(er) handling of quantization through parallelization and lookup. 
+- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ 0.8 Tokens/s on my 2021 Thinkpad in < 8GB RAM. "Fast"(er) handling of quantization through parallelization and lookup.
 - Speed improvements over original implementation from parallelizing much of the inference process (by grouping operations and then parallelizing with OpenMP)
+
+## Motivation and niche
+
+I wrote [earlier](http://marble.onl/posts/why_host_your_own_llm.html) that I think language model *inferenece* should be self-hosted for most non-trivial uses. A big reason for this is that LLMs are still a new and rapidly evolving technology and that being able to "hack" the implementation is important to make the best use of them. A corollary to being able to hack the implementation is being able to easily understand and modify the code. The requirements for a hackable model are at odds with the requirements for a framework that has lots of composable parts and works across many platforms. What I want, and see a niche for, is something that's dead simple, where the only abstraction is linear algebra and matrix operations, but is also fast enough to run inference at competitive speeds on normal hardware. 
+
+[Pytorch](https://pytorch.org/) is a full featured framework but is highly abstracted and not optimized for CPU inference. [Llama.cpp / ggml](https://github.com/ggerganov/llama.cpp) is well optimized for a wide range of hardware and has a simpler project structure compared to pytorch that increases hackability. However as of writing, ggml.c is 20k lines and llama.cpp is 7k. The hand optimization across many platforms plus big range of options (all of which make it a good, full featured software project) make it heavy to work with. [Llama2.c](https://github.com/karpathy/llama2.c) (the names are confusing and I may change the name of this project) is very hackable (although less than when it started) and simple to understand. It is not optimized; while in principle it could be, it will still be a C program that requires memory management and manual vector / matrix operations.
+
+| | Pytorch | llama.cpp | llama2.c | llama2.f90 |
+|-|---------|-----------|----------|------------|
+|Good abstraction| x | x | | |
+|Broad hardware support| x | x | | |
+|Simple & Hackable| | | x | x |
+|Fast| | x | | x |
+|Memory and linalg| x | | | x |
+
+What I want to do with Llama2.f90 is retain the hackability of llama2.c, but with the speed of Llama.cpp (currently we achieve comparable speeds on CPU) and the matrix and memory support of Fortran. So far optimization has not significantly diminished the readability or understandability of the code. The goal is not a framework that can be called from other programs, but example source code that can be modified directly for custom use. The hope is that such modifications will be as easy or easier than working with a high level framework. At the same time, we provide the capability of running an LLM from the command line. 
+
+Additional options, such as quantization (under development), I prefer to include in dedicated programs instead of as branches of one main program. Likewise if we decide to support another model. In this way (hopefully) we keep everything simple and easy to use and hack elsewhere.
 
 ## How
 
