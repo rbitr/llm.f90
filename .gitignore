@@ -1,5 +1,6 @@
 llm
 *.bin
 *.mod
+models/*
 *.o
 massif*

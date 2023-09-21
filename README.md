@@ -3,51 +3,50 @@ LLaMA2 model inference in Fortran
 
 ## Notice
 
-This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.c It's based on a version of the code circa July 28, 2023. The project has since become way more complicated.
+This is based on llama2.c by Andrej Karpathy https://github.com/karpathy/llama2.c It was originally based on a version of the code circa July 28, 2023 and in partcular uses the model formats from that project.
+
+If you have trouble running anything or have comments, suggestions, feature requests, etc, please get in touch or open an issue.
 
 ## What
 
-LLaMA2 type LLM inference architecture implemented as a single Fortran file. The toy model uses the "Tiny Stories" checkpoint from the llama2.c project, and reproduces those results. It's a bit of a wall of code, but should make sense in the context of the ipython notebook linked below and the llama2.c project. 
+LLaMA2 type LLM inference architecture implemented as a single Fortran file. Runs the "toy" models from llama2.c as well as the bigger LLaMA models.
 
-I've since found out there are Fortran implementations of inference for various GPT models: https://github.com/certik/fastgpt 
+For Fortran implementations of inference for various GPT models see https://github.com/certik/fastgpt 
 
-## Why
+Progress so far:
 
-I saw a discussion last week about Fotran and realized I had never used it and it looked interesting: https://news.ycombinator.com/item?id=37295144
+- runs LLaMA style toy models and base models (tested up to 7B)
+- original implementation matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524 It should be faster now as more has been parallelized
+- Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ ~~0.8~~ 2.5 Tokens/s on my 2021 Thinkpad in < 8GB RAM, matching the speed of llama.cpp
+- Speed improvements over original implementation from parallelizing much of the inference process (by grouping operations and then parallelizing with OpenMP)
 
-This seemed like a good way to learn and explore Fortran for machine learning type programming. 
+## Motivation and niche
 
-See also https://github.com/rbitr/llama2.ipynb my implementation in python. Python was easier, Fortran was more fun!
+I wrote [earlier](http://marble.onl/posts/why_host_your_own_llm.html) that I think language model *inferenece* should be self-hosted for most non-trivial uses. A big reason for this is that LLMs are still a new and rapidly evolving technology and that being able to "hack" the implementation is important to make the best use of them. A corollary to being able to hack the implementation is being able to easily understand and modify the code. The requirements for a hackable model are at odds with the requirements for a framework that has lots of composable parts and works across many platforms. What I want, and see a niche for, is something that's dead simple, where the only abstraction is linear algebra and matrix operations, but is also fast enough to run inference at competitive speeds on normal hardware. 
 
-## Impressions
+[Pytorch](https://pytorch.org/) is a full featured framework but is highly abstracted and not optimized for CPU inference. [Llama.cpp / ggml](https://github.com/ggerganov/llama.cpp) is well optimized for a wide range of hardware and has a simpler project structure compared to pytorch that increases hackability. However as of writing, ggml.c is 20k lines and llama.cpp is 7k. The hand optimization across many platforms plus big range of options (all of which make it a good, full featured software project) make it heavy to work with. [Llama2.c](https://github.com/karpathy/llama2.c) (the names are confusing and I may change the name of this project) is very hackable (although less than when it started) and simple to understand. It is not optimized; while in principle it could be, it will still be a C program that requires memory management and manual vector / matrix operations.
 
-Things I liked:
+| | Pytorch | llama.cpp | llama2.c | llama2.f90 |
+|-|---------|-----------|----------|------------|
+|Good abstraction| x | x | | |
+|Broad hardware support| x | x | | |
+|Simple & Hackable| | | x | x |
+|Fast| | x | | x |
+|Memory and linalg| x | | | x |
 
-- memory management
-- array slicing
-- intrinsics (higher level functions like `matmul`)
-- seemingly fast - with default compiler options, I get ~165 tokens/s with the 15M model from this implementation vs. 75 tokens/s from llama2.c on my 2021 Thinkpad. However, using OMP parallelization I get 250 tokens/s with llama2.c. 
-- fun
 
-Interesting things (I could be wrong about some):
+What I want to do with Llama2.f90 is retain the hackability of llama2.c, but with the speed of Llama.cpp (currently we achieve comparable speeds on CPU) and the matrix and memory support of Fortran. So far optimization has not significantly diminished the readability or understandability of the code. The goal is not a framework that can be called from other programs, but example source code that can be modified directly for custom use. The hope is that such modifications will be as easy or easier than working with a high level framework. At the same time, we provide the capability of running an LLM from the command line. 
 
-- 1 based indexing (and off-by one errors can have a very subtle impact on output)
-- column major arrays
-- fixed size strings in arrays
-- no native way to tell if a string has trailing spaces (important for tokenization)
-- all the variables declared at the top
-- trims matrix operation results to fit arrays? 
-- harder to find answers to questions
-- confusion about different standards; I think this is 2003 compliant
-- parallelization  
+Additional options, such as quantization (under development), I prefer to include in dedicated programs instead of as branches of one main program. Likewise if we decide to support another model. In this way (hopefully) we keep everything simple and easy to use and hack elsewhere.
 
-Overall, I can see how Fortran is competitive with C for compiled ML applications that have lots of linear algebra and run naively on the cpu. It has the right intrinsic functions, handles memory more easily than C (though declarations are awkward) and handles arrays natively. It remains to be seen how easily it works with other accelerators (BLAS, etc). 
 
 ## How
 
 Clone the repo
 ```bash
 git clone https://github.com/rbitr/llama2.f90
+# also requires https://github.com/Maratyszcza/FP16/ for FP16
+# otherwise use the old_master branch
 ```
 
 Download the trained model from HF
@@ -57,11 +56,15 @@ cd llama2.f90
 wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
 # 42M parameter model
 wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
+# 110M parameter model 
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
 ``` 
 
 Compile (only tested with GNU Fortran on Ubuntu)
 ```bash
-gfortran llama2.f90 -o llm
+# requires the FP16 code referenced above 
+# edit to select your appropriate compiler
+make llm
 ```
 
 Now supports some proper command line arguments
@@ -75,6 +78,9 @@ case ('-m', '--model')
 case ('-p', '--prompt')
 ! prompt string
 --
+case ('-s', '--tokenizer')
+! path to custom tokenizer
+--
 case ('-t', '--temperature')
 ! temperature scaling
 --
@@ -85,7 +91,7 @@ case ('-v', '--verbose')
 ! print additional information
 ```
 
-Run the model:
+Run the model (see the bottom for the latest example):
 
 
 ```bash
@@ -177,4 +183,37 @@ $ ./llm -v -m ./<path>/llama2_7b_chat_ak.bin
 * "Die Kraftwerk AG ist ein wichtiger Energieversor 
  Inference time:    1056.36633      seconds
   0.242340162     tokens/second
+```
+
+## Quantized models
+
+The original model used 32-bit reals and e.g needs almost 30GB to run the 7B model and will not run the 3B on my machine with 16GB RAM. The [sixteen_bit](https://github.com/rbitr/llama2.f90/tree/sixteen_bit) branch, has been merged into master and uses an [external](https://github.com/Maratyszcza/FP16/) C library to convert reals to 16-bit floats packed in Fortran `integer(2)`s. 
+
+```bash
+$ ./llm -m ./models/open_llama_3b_v2_ak.bin -s ./models/tokenizer_open3b.bin -t 0.9 -v -n 64 -p "I stopped posting in knitting forums because"
+ Embedding dimension:         3200
+ Hidden dimension:         8640
+ Layers:           26
+ Heads:           32
+ kv Heads:           32
+ Vocabulary Size:       -32000
+ Sequence Length:         2048
+ loaded embedding weights:   102400000
+ loaded rms att weights:       83200
+ loaded wq weights:   266240000
+ loaded wk weights:   266240000
+ loaded wv weights:   266240000
+ loaded wo weights:   266240000
+ loaded rms ffn  weights:       83200
+ loaded w1 weights:   718848000
+ loaded w2 weights:   718848000
+ loaded w3 weights:   718848000
+ loaded rms_final weights:        3200
+ loaded freq cis real  weights:      102400
+ loaded freq_cis_imag weights:      102400
+ loaded wcls weights:   102400000
+ Loaded weights
+I stopped posting in knitting forums because my babes were too young to appreciate my hobby. But until the last few months, I'd managed to avoid the Instant Pot threads. Why? Because I hadn't quite made the leap from the not-on-Cooking-Foibles-people-ra 
+ Inference time:    75.8880005      seconds
+  0.830170751     tokens/second
 ```
