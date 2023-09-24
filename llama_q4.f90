@@ -160,6 +160,7 @@ end module arg_parse
 module conversions
         use iso_c_binding
         use quants
+        use precision_module
         implicit none
 
         interface
@@ -195,8 +196,13 @@ module conversions
         
         end interface
 
-        real :: f32_lookup_table(-32768:32766)
+        real(kind=wp) :: f32_lookup_table(-32768:32766)
+        integer(2) :: i4_lookup_table(2,-128:126)
         integer(2) :: v
+        integer(1) :: w
+        ! this should be 128 MB
+        real(kind=wp) :: d
+        real(kind=wp) :: i4_f32_lookup_table(2,-128:126,-32768:32768)
 
         contains
 
@@ -207,6 +213,24 @@ module conversions
         
                 end subroutine
 
+                subroutine build_i4_lookup_table
+                        do w = -128,126
+                        i4_lookup_table(1,w) = unpack_low_c(w) - 8
+                        i4_lookup_table(2,w) = unpack_high_c(w) - 8
+                        end do
+                end subroutine
+
+                subroutine build_i4_f32_lookup_table
+                        do v = -32768,32766
+                        d = half_to_float_c(v)
+                        do w = -128,126
+                        i4_f32_lookup_table(1,w,v) = (unpack_low_c(w) - 8)*d
+                        i4_f32_lookup_table(2,w,v) = (unpack_high_c(w) - 8)*d
+                        end do
+                        end do
+                end subroutine
+
+
 end module conversions
 
 program llama2 
@@ -216,7 +240,8 @@ program llama2
         use arg_parse
         use omp_lib
         use conversions, only: float_to_half_c, half_to_float_c, build_f32_lookup_table,&
-                &f32_lookup_table, pack2x4_c, unpack_high_c, unpack_low_c
+                &f32_lookup_table, pack2x4_c, unpack_high_c, unpack_low_c, build_i4_lookup_table,&
+                i4_lookup_table, i4_f32_lookup_table, build_i4_f32_lookup_table
         use quants
         implicit none
 
@@ -539,8 +564,11 @@ program llama2
         ! __main__ part
 
         ! build lookup table
+        print *, "building tables"
         call build_f32_lookup_table
-
+        call build_i4_lookup_table
+        call build_i4_f32_lookup_table
+        print *, "done"
         temperature = arg_values%temperature
         prompt = arg_values%prompt
 
@@ -755,16 +783,29 @@ contains
                 integer :: i,j
                 real(kind=wp) :: d
                 integer(kind=ip4) :: p
+                integer(2) :: nibs(2)
+                real(kind=wp) :: fibs(2)
+                integer(2) :: xdi, ix
 
+                !!$OMP PARALLEL DO PRIVATE(i,j,fibs) 
                 do i=1,size(x%d)
                         d = f32_lookup_table(x%d(i))
+                        !xdi = x%d(i)
+                        !ix = (i-1)*qk4/2
                         do j = 1,qk4/2
                                 p = x%qs((i-1)*qk4/2+j)
-                                v_q4_to_float((i-1)*qk4+j) = (unpack_low_c(p) - 8) * d
-                                v_q4_to_float((i-1)*qk4+qk4/2+j) = (unpack_high_c(p) - 8) * d          
+                                nibs = i4_lookup_table(:,p) 
+                                !fibs = i4_f32_lookup_table(:,x%qs(ix+j),xdi)
+                                !v_q4_to_float((i-1)*qk4+j) = fibs(1)
+                                !v_q4_to_float((i-1)*qk4+qk4/2+j) = fibs(2)
+                                v_q4_to_float((i-1)*qk4+j) = nibs(1) * d
+                                v_q4_to_float((i-1)*qk4+qk4/2+j) = nibs(2) * d 
+                                !v_q4_to_float((i-1)*qk4+j) = (unpack_low_c(p) - 8) * d
+                                !v_q4_to_float((i-1)*qk4+qk4/2+j) = (unpack_high_c(p) - 8) * d          
 
                         end do
                 end do
+                !!$OMP END PARALLEL DO
 
 
         end function
