@@ -46,19 +46,19 @@ module weight_module
                 type(q42) :: token_embedding_table
                 real(kind=wp), allocatable :: rms_att_weight(:,:)
                 real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-                integer(2), allocatable :: wq(:,:,:)
-                !type(q43) :: wq, wk, wv, wo, w1, w2, w3
-                integer(2), allocatable :: wk(:,:,:)
-                integer(2), allocatable :: wv(:,:,:)
-                integer(2), allocatable :: wo(:,:,:)
-                integer(2), allocatable :: w1(:,:,:)
-                integer(2), allocatable :: w2(:,:,:)
-                integer(2), allocatable :: w3(:,:,:)
+                !integer(2), allocatable :: wq(:,:,:)
+                type(q43) :: wq, wk, wv, wo, w1, w2, w3
+                !integer(2), allocatable :: wk(:,:,:)
+                !integer(2), allocatable :: wv(:,:,:)
+                !integer(2), allocatable :: wo(:,:,:)
+                !integer(2), allocatable :: w1(:,:,:)
+                !integer(2), allocatable :: w2(:,:,:)
+                !integer(2), allocatable :: w3(:,:,:)
                 real(kind=wp), allocatable :: rms_final_weight(:)
                 real(kind=wp), allocatable :: freq_cis_real(:,:)
                 real(kind=wp), allocatable :: freq_cis_imag(:,:)
-                integer(2), allocatable :: wcls(:,:)
-                !type(q42) :: wcls
+                !integer(2), allocatable :: wcls(:,:)
+                type(q42) :: wcls
 
         end type TransformerWeights
 
@@ -271,6 +271,7 @@ program llama2
                 read(5) emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
                 
                 if (verbose) then
+                        print *, "Four bit quantization"
                         print *, "Embedding dimension: ", emb_dim
                         print *, "Hidden dimension: ", hidden_dim
                         print *, "Layers: ", n_layers
@@ -293,7 +294,7 @@ program llama2
                 
                 !allocate(weights%token_embedding_table(emb_dim,vocab_size))
                 ! second dim only...
-                allocate(weights%token_embedding_table%vs(vocab_size))
+                !allocate(weights%token_embedding_table%vs(vocab_size))
                 allocate(temp2(emb_dim,vocab_size))
                 read(5) temp2
                 weights%token_embedding_table = v_float_to_q42(temp2)
@@ -314,61 +315,69 @@ program llama2
                 end if
 
 
-                allocate(weights%wq(emb_dim,emb_dim,n_layers))
+                !allocate(weights%wq(emb_dim,emb_dim,n_layers))
                 allocate(temp2(emb_dim,emb_dim))
+                allocate(weights%wq%ls(n_layers))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) temp2
-                weights%wq(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%wq(:,:,l) = v_float_to_half_c2(temp2)
+                weights%wq%ls(l) = v_float_to_q42(temp2)
                 end do
                 !deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded wq weights:", size(weights%wq)
+                        print *, "loaded wq weights:", size(weights%wq%ls)
                 end if
                 
-                allocate(weights%wk(emb_dim,emb_dim,n_layers))
+                !allocate(weights%wk(emb_dim,emb_dim,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
+                allocate(weights%wk%ls(n_layers))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) temp2
-                weights%wk(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%wk(:,:,l) = v_float_to_half_c2(temp2)
+                weights%wk%ls(l) = v_float_to_q42(temp2)
                 end do
                 !deallocate(temp2)
 
 
                 if (verbose) then
-                        print *, "loaded wk weights:", size(weights%wk)
+                        print *, "loaded wk weights:", size(weights%wk%ls)
                 end if
                 
-                allocate(weights%wv(emb_dim,emb_dim,n_layers))
+                !allocate(weights%wv(emb_dim,emb_dim,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
+                allocate(weights%wv%ls(n_layers))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) temp2
-                weights%wv(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%wv(:,:,l) = v_float_to_half_c2(temp2)
+                weights%wv%ls(l) = v_float_to_q42(temp2)
                 end do
                 !deallocate(temp2)
 
         
 
                 if (verbose) then
-                        print *, "loaded wv weights:", size(weights%wv)
+                        print *, "loaded wv weights:", size(weights%wv%ls)
                 end if
                 
-                allocate(weights%wo(emb_dim,emb_dim,n_layers))
+                !allocate(weights%wo(emb_dim,emb_dim,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
+                allocate(weights%wo%ls(n_layers))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) temp2
-                weights%wo(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%wo(:,:,l) = v_float_to_half_c2(temp2)
+                weights%wo%ls(l) = v_float_to_q42(temp2)
                 end do
                 deallocate(temp2)
 
 
 
                 if (verbose) then
-                        print *, "loaded wo weights:", size(weights%wo)
+                        print *, "loaded wo weights:", size(weights%wo%ls)
                 end if
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
@@ -381,40 +390,46 @@ program llama2
                         print *, "loaded rms ffn  weights:", size(weights%rms_ffn_weight)
                 end if
 
-                allocate(weights%w1(emb_dim,hidden_dim,n_layers))
+                !allocate(weights%w1(emb_dim,hidden_dim,n_layers))
                 allocate(temp2(emb_dim,hidden_dim))
+                allocate(weights%w1%ls(n_layers))
                 do l = 1,n_layers
                 read(5) temp2
-                weights%w1(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%w1(:,:,l) = v_float_to_half_c2(temp2)
+                weights%w1%ls(l) = v_float_to_q42(temp2)
                 end do
                 deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded w1 weights:", size(weights%w1)
+                        print *, "loaded w1 weights:", size(weights%w1%ls)
                 end if
 
-                allocate(weights%w2(hidden_dim,emb_dim,n_layers))
+                !allocate(weights%w2(hidden_dim,emb_dim,n_layers))
                 allocate(temp2(hidden_dim,emb_dim))
+                allocate(weights%w2%ls(n_layers))
                 do l = 1,n_layers
                 read(5) temp2
-                weights%w2(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%w2(:,:,l) = v_float_to_half_c2(temp2)
+                weights%w2%ls(l) = v_float_to_q42(temp2)
                 end do
                 deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded w2 weights:", size(weights%w2)
+                        print *, "loaded w2 weights:", size(weights%w2%ls)
                 end if
 
-                allocate(weights%w3(emb_dim,hidden_dim,n_layers))
+                !allocate(weights%w3(emb_dim,hidden_dim,n_layers))
                 allocate(temp2(emb_dim,hidden_dim))
+                allocate(weights%w3%ls(n_layers))
                 do l = 1,n_layers
                 read(5) temp2
-                weights%w3(:,:,l) = v_float_to_half_c2(temp2)
+                !weights%w3(:,:,l) = v_float_to_half_c2(temp2)
+                weights%w3%ls(l) = v_float_to_q42(temp2)
                 end do
                 deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded w3 weights:", size(weights%w3)
+                        print *, "loaded w3 weights:", size(weights%w3%ls)
                 end if
 
                 allocate(weights%rms_final_weight(emb_dim))
@@ -451,14 +466,14 @@ program llama2
 
 
                 if (.not. shared_weights) then
-                        allocate(weights%wcls(emb_dim,vocab_size))
+                        !allocate(weights%wcls(emb_dim,vocab_size))
                         allocate(temp2(emb_dim,vocab_size))
                         read(5) temp2
-                        weights%wcls = v_float_to_half_c2(temp2)
+                        weights%wcls = v_float_to_q42(temp2)
                         deallocate(temp2)
 
                         if (verbose) then
-                                print *, "loaded wcls weights:", size(weights%wcls)
+                                print *, "loaded wcls weights:", size(weights%wcls%vs)
                         end if
 
                 end if
@@ -488,7 +503,7 @@ program llama2
         s%key_cache(:,:,:) = 0
         s%value_cache(:,:,:) = 0
         s%times = 0
-
+        
         ! read in token vocab
         open(UNIT=5, FILE=arg_values%tokenizer, FORM="UNFORMATTED",&
                & ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
@@ -537,7 +552,6 @@ program llama2
         end if
 
         t_ms_start = 0
-
         ! encode the prompt
         prompt_tokens = bpe_encode(prompt)
 
@@ -590,9 +604,11 @@ contains
                 real(kind=wp) :: temp(size(xb))        
                 integer :: row, l
                 real(kind=wp) :: hb, hb2
-                temp = v_half_to_float_lookup(w%w1(:,row,l))
+                !temp = v_half_to_float_lookup(w%w1(:,row,l))
+                temp = v_q4_to_float(w%w1%ls(l)%vs(row))
                 hb = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%w3(:,row,l))
+                !temp = v_half_to_float_lookup(w%w3(:,row,l))
+                temp = v_q4_to_float(w%w3%ls(l)%vs(row))
                 hb2 = dot_product(xb,temp)
 
                 hb = hb*(1/(1+exp(-hb)))
@@ -608,11 +624,15 @@ contains
                 integer :: row, l
                 real(kind=wp) :: p(3)
 
-                temp = v_half_to_float_lookup(w%wq(:,row,l))
+                !temp = v_half_to_float_lookup(w%wq(:,row,l))
+                !lth layer, rowth vector... could be cleaner
+                temp = v_q4_to_float(w%wq%ls(l)%vs(row))
                 p(1) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wk(:,row,l))
+                !temp = v_half_to_float_lookup(w%wk(:,row,l))
+                temp = v_q4_to_float(w%wk%ls(l)%vs(row))
                 p(2) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wv(:,row,l))
+                !temp = v_half_to_float_lookup(w%wv(:,row,l))
+                temp = v_q4_to_float(w%wv%ls(l)%vs(row))
                 p(3) = dot_product(xb,temp)
 
         end function
@@ -751,7 +771,7 @@ contains
 
         function v_q4_to_float2(q)
                 type(q42), intent(in) :: q
-                real(kind=wp) :: v_q4_to_float2(size(q%vs)*2, size(q%vs(1)%qs)*2)
+                real(kind=wp) :: v_q4_to_float2(size(q%vs(1)%qs)*2,size(q%vs))
                 integer :: i,j
                 !$OMP PARALLEL DO PRIVATE(j)
                 do j = 1,size(q%vs)
@@ -936,7 +956,6 @@ contains
                 ! convert precision        
                 !x = v_half_to_float_lookup(w%token_embedding_table(:,token))
                 x = v_q4_to_float(w%token_embedding_table%vs(token))
-
                 freq_cis_real_row = w%freq_cis_real(:,pos)
                 freq_cis_imag_row = w%freq_cis_imag(:,pos)
 
@@ -1016,7 +1035,8 @@ contains
                         ! parallel convert + matmul seems to help
                         !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        !temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        temp = v_q4_to_float(w%wo%ls(l)%vs(ix)) 
                         x(ix) = x(ix) + dot_product(xb,temp)
                         !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
@@ -1036,7 +1056,8 @@ contains
                         ! try convert + matmul here
                         !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
-                        temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
+                        !temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
+                        temp2 = v_q4_to_float(w%w2%ls(l)%vs(ix))
                         x(ix) = x(ix) + dot_product(hb,temp2)
                         end do
                         !$OMP END PARALLEL DO
@@ -1051,13 +1072,13 @@ contains
                 x = rmsnorm(x, w%rms_final_weight)
 
       
-      
                 if (shared_weights) then
                         logits = vm_matmul(x,v_q4_to_float2(w%token_embedding_table))
                 else
                         !$OMP PARALLEL DO PRIVATE (ix, temp)
                         do ix = 1,p%vocab_size
-                                temp = v_half_to_float_lookup(w%wcls(:,ix))
+                                !temp = v_half_to_float_lookup(w%wcls(:,ix))
+                                temp = v_q4_to_float(w%wcls%vs(ix))
                                 logits(ix) = dot_product(x,temp)
                         end do
                         !$OMP END PARALLEL DO

@@ -6,7 +6,7 @@ EXEFILE = llama_q4
 convert.o: convert.c
 	$(GCC) -c -O3 -I$(F16DIR) convert.c -lm
 
-llama2.o: llama2.f90
+llama2.o: $(EXEFILE).f90
 	$(FORTRAN) -c -O3 -march=native -ffast-math -funroll-loops -fopenmp $(EXEFILE).f90 
 
 llm: convert.o llama2.o
