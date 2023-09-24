@@ -15,6 +15,7 @@ For Fortran implementations of inference for various GPT models see https://gith
 
 Progress so far:
 
+- Update: Added 4-bit quantization (for most weights), see the four_bit_dev branch. Not yet optimized for speed (I need to see if a lookup table for 4 bit conversion + math is faster, and evaluate the way I did the data structures). Reduces the memory footprint.
 - runs LLaMA style toy models and base models (tested up to 7B)
 - original implementation matches llama2.c for speed: see https://github.com/rbitr/llama2.f90/issues/3#issuecomment-1711905524 It should be faster now as more has been parallelized
 - Now uses F16 quantization by default for most layers. Runs a 3B model a ~~0.1~~ ~~0.23~~ ~~0.8~~ 2.5 Tokens/s on my 2021 Thinkpad in < 8GB RAM, matching the speed of llama.cpp
