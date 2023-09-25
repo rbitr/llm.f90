@@ -629,15 +629,17 @@ contains
         function p_mlp(xb,row,l, w) result(hb)
                 real(kind=wp) :: xb(:)
                 type(TransformerWeights), intent(in) :: w
-                real(kind=wp) :: temp(size(xb))        
+                !real(kind=wp) :: temp(size(xb))        
                 integer :: row, l
                 real(kind=wp) :: hb, hb2
                 !temp = v_half_to_float_lookup(w%w1(:,row,l))
-                temp = v_q4_to_float(w%w1%ls(l)%vs(row))
-                hb = dot_product(xb,temp)
+                !temp = v_q4_to_float(w%w1%ls(l)%vs(row))
+                !hb = dot_product(xb,temp)
+                hb = q4_f32_dot_product(xb,w%w1%ls(l)%vs(row))
                 !temp = v_half_to_float_lookup(w%w3(:,row,l))
-                temp = v_q4_to_float(w%w3%ls(l)%vs(row))
-                hb2 = dot_product(xb,temp)
+                !temp = v_q4_to_float(w%w3%ls(l)%vs(row))
+                !hb2 = dot_product(xb,temp)
+                hb2 = q4_f32_dot_product(xb,w%w3%ls(l)%vs(row))
 
                 hb = hb*(1/(1+exp(-hb)))
 
@@ -648,20 +650,55 @@ contains
         function p_proj(xb,row,l,w) result(p)
                 real(kind=wp) :: xb(:)
                 type(TransformerWeights), intent(in) :: w
-                real(kind=wp) :: temp(size(xb))
+                !real(kind=wp) :: temp(size(xb))
                 integer :: row, l
                 real(kind=wp) :: p(3)
 
                 !temp = v_half_to_float_lookup(w%wq(:,row,l))
                 !lth layer, rowth vector... could be cleaner
-                temp = v_q4_to_float(w%wq%ls(l)%vs(row))
-                p(1) = dot_product(xb,temp)
+                !temp = v_q4_to_float(w%wq%ls(l)%vs(row))
+                !p(1) = dot_product(xb,temp)
+                p(1) = q4_f32_dot_product(xb,w%wq%ls(l)%vs(row))
                 !temp = v_half_to_float_lookup(w%wk(:,row,l))
-                temp = v_q4_to_float(w%wk%ls(l)%vs(row))
-                p(2) = dot_product(xb,temp)
+                !temp = v_q4_to_float(w%wk%ls(l)%vs(row))
+                !p(2) = dot_product(xb,temp)
+                p(2) = q4_f32_dot_product(xb,w%wk%ls(l)%vs(row))
                 !temp = v_half_to_float_lookup(w%wv(:,row,l))
-                temp = v_q4_to_float(w%wv%ls(l)%vs(row))
-                p(3) = dot_product(xb,temp)
+                !temp = v_q4_to_float(w%wv%ls(l)%vs(row))
+                !p(3) = dot_product(xb,temp)
+                p(3) = q4_f32_dot_product(xb,w%wv%ls(l)%vs(row))
+
+        end function
+
+        function q4_f32_dot_product(y,x) result (z)
+                ! x is a q41 object
+                ! y is a real(2) with the same length
+                type(q41) :: x
+                real(kind=wp) :: y(:)
+                real(kind=wp) :: z, zi
+                integer(2) :: i, j
+                integer(kind=ip4) :: p
+                integer(2) :: nibs(2) 
+
+                z = 0
+                
+                do i=1,size(x%d)
+                        zi = 0
+                        !d = f32_lookup_table(x%d(i))
+                        do j = 1,qk4/2
+                                p = x%qs((i-1)*qk4/2+j)
+                                nibs = i4_lookup_table(:,p)
+                                zi = zi + nibs(1) * y((i-1)*qk4+j) + nibs(2) * y((i-1)*qk4+qk4/2+j)
+
+                                !v_q4_to_float((i-1)*qk4+j) = nibs(1) * d
+                                !v_q4_to_float((i-1)*qk4+qk4/2+j) = nibs(2) * d
+
+                        end do
+                        zi = zi*f32_lookup_table(x%d(i))
+                        z = z+zi
+                end do
+
+
 
         end function
 
@@ -1077,8 +1114,9 @@ contains
                         !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
                         !temp = v_half_to_float_lookup(w%wo(:,ix,l))
-                        temp = v_q4_to_float(w%wo%ls(l)%vs(ix)) 
-                        x(ix) = x(ix) + dot_product(xb,temp)
+                        !temp = v_q4_to_float(w%wo%ls(l)%vs(ix)) 
+                        !x(ix) = x(ix) + dot_product(xb,temp)
+                        x(ix) = x(ix) + q4_f32_dot_product(xb,w%wo%ls(l)%vs(ix))
                         !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
                         !$OMP END PARALLEL DO
@@ -1098,8 +1136,9 @@ contains
                         !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
                         !temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
-                        temp2 = v_q4_to_float(w%w2%ls(l)%vs(ix))
-                        x(ix) = x(ix) + dot_product(hb,temp2)
+                        !temp2 = v_q4_to_float(w%w2%ls(l)%vs(ix))
+                        !x(ix) = x(ix) + dot_product(hb,temp2)
+                        x(ix) = x(ix) + q4_f32_dot_product(hb,w%w2%ls(l)%vs(ix))
                         end do
                         !$OMP END PARALLEL DO
                         !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
