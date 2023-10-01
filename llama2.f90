@@ -747,6 +747,8 @@ contains
 
                 real(kind=wp) :: x(p%emb_dim)
                 real(kind=wp) :: xb(p%emb_dim)
+                real(kind=wp) :: temp(p%emb_dim)
+                real(kind=wp) :: temp2(p%hidden_dim)
                 real(kind=wp) :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
                 real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
@@ -857,7 +859,18 @@ contains
                         s%times(3) = s%times(3) + (time_ms() - time)
 
                         time = time_ms()
-                        x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
+                        
+                        ! parallel convert + matmul seems to help
+                        !$OMP PARALLEL DO PRIVATE(ix,temp)
+                        do ix=1,p%emb_dim
+                        temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        x(ix) = x(ix) + dot_product(xb,temp)
+                        !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
+                        end do
+                        !$OMP END PARALLEL DO
+                        
+                        !xb = xb/sqrt(dot_product(x,x)/size(x)+1e-5)
+                        !x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
@@ -867,8 +880,15 @@ contains
                         end do
                         !$OMP END PARALLEL DO
                         
-                        xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
-                        x = x + xb
+                        ! try convert + matmul here
+                        !$OMP PARALLEL DO PRIVATE(ix, temp2)
+                        do ix = 1,p%emb_dim
+                        temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
+                        x(ix) = x(ix) + dot_product(hb,temp2)
+                        end do
+                        !$OMP END PARALLEL DO
+                        !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
+                        !x = x + xb
 
                         s%times(4) = s%times(4) + (time_ms() - time)
 
@@ -882,7 +902,13 @@ contains
                 if (shared_weights) then
                         logits = vm_matmul(x,v_half_to_float_lookup2(w%token_embedding_table))
                 else
-                        logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
+                        !$OMP PARALLEL DO PRIVATE (ix, temp)
+                        do ix = 1,p%vocab_size
+                                temp = v_half_to_float_lookup(w%wcls(:,ix))
+                                logits(ix) = dot_product(x,temp)
+                        end do
+                        !$OMP END PARALLEL DO
+                        !logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
                 end if
                 s%times(5) = s%times(5) + (time_ms() - time)
 
