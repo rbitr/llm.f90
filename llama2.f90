@@ -239,10 +239,10 @@ program llama2
                 ! allocate temp, read in, convert to half precision
                 
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
-                allocate(temp2(emb_dim,vocab_size))
-                read(5) temp2
-                weights%token_embedding_table = v_float_to_half_c2(temp2)
-                deallocate(temp2)
+                !allocate(temp2(emb_dim,vocab_size))
+                read(5) weights%token_embedding_table
+                !weights%token_embedding_table = v_float_to_half_c2(temp2)
+                !deallocate(temp2)
                 
                 if (verbose) then
                         print *, "loaded embedding weights:", size(weights%token_embedding_table)
@@ -260,11 +260,11 @@ program llama2
 
 
                 allocate(weights%wq(emb_dim,emb_dim,n_layers))
-                allocate(temp2(emb_dim,emb_dim))
+                !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) temp2
-                weights%wq(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%wq(:,:,l)
+                !weights%wq(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
@@ -276,8 +276,8 @@ program llama2
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) temp2
-                weights%wk(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%wk(:,:,l)
+                !weights%wk(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
@@ -290,8 +290,8 @@ program llama2
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) temp2
-                weights%wv(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%wv(:,:,l)
+                !weights%wv(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
@@ -305,10 +305,10 @@ program llama2
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) temp2
-                weights%wo(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%wo(:,:,l)
+                !weights%wo(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                deallocate(temp2)
+                !deallocate(temp2)
 
 
 
@@ -327,36 +327,36 @@ program llama2
                 end if
 
                 allocate(weights%w1(emb_dim,hidden_dim,n_layers))
-                allocate(temp2(emb_dim,hidden_dim))
+                !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
-                read(5) temp2
-                weights%w1(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%w1(:,:,l)
+                !weights%w1(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                deallocate(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w1 weights:", size(weights%w1)
                 end if
 
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
-                allocate(temp2(hidden_dim,emb_dim))
+                !allocate(temp2(hidden_dim,emb_dim))
                 do l = 1,n_layers
-                read(5) temp2
-                weights%w2(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%w2(:,:,l)
+                !weights%w2(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                deallocate(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w2 weights:", size(weights%w2)
                 end if
 
                 allocate(weights%w3(emb_dim,hidden_dim,n_layers))
-                allocate(temp2(emb_dim,hidden_dim))
+                !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
-                read(5) temp2
-                weights%w3(:,:,l) = v_float_to_half_c2(temp2)
+                read(5) weights%w3(:,:,l)
+                !weights%w3(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                deallocate(temp2)
+                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w3 weights:", size(weights%w3)
@@ -397,10 +397,10 @@ program llama2
 
                 if (.not. shared_weights) then
                         allocate(weights%wcls(emb_dim,vocab_size))
-                        allocate(temp2(emb_dim,vocab_size))
-                        read(5) temp2
-                        weights%wcls = v_float_to_half_c2(temp2)
-                        deallocate(temp2)
+                        !allocate(temp2(emb_dim,vocab_size))
+                        read(5) weights%wcls
+                        !weights%wcls = v_float_to_half_c2(temp2)
+                        !deallocate(temp2)
 
                         if (verbose) then
                                 print *, "loaded wcls weights:", size(weights%wcls)
