@@ -449,7 +449,6 @@ program llama2
                 do n = 1,vocab_size
 
 
-
                 read(5) score
                 read(5) tok_len
                 allocate (character(tok_len) :: tmpstr)
@@ -461,7 +460,6 @@ program llama2
                 vocab_len(n) = tok_len
 
                 deallocate(tmpstr)
-
                 end do
 
         close(5)
@@ -470,7 +468,6 @@ program llama2
 
         ! build lookup table
         call build_f32_lookup_table
-
         temperature = arg_values%temperature
         prompt = arg_values%prompt
 
@@ -482,7 +479,6 @@ program llama2
         end if
 
         t_ms_start = 0
-
         ! encode the prompt
         prompt_tokens = bpe_encode(prompt)
 
