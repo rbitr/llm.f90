@@ -1,9 +1,13 @@
 # llama2.f90
 LLaMA2 model inference in Fortran
 
-## Use
+## About
 
 Supports llama2 models in gguf format (f16 only - but see the four\_bit\_dev branch)
+
+For Fortran implementations of inference for various GPT models see https://github.com/certik/fastgpt
+
+## Use
 
 ### Dependencies
 This unfortunately uses a separate c-library somewhat trivially to convert between f32 and f16. 
