@@ -531,9 +531,9 @@ contains
                 real(kind=wp) :: temp(size(xb))        
                 integer :: row, l
                 real(kind=wp) :: hb, hb2
-                temp = v_half_to_float_lookup(w%w1(:,row,l))
+                temp = v_half_to_float_c(w%w1(:,row,l))
                 hb = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%w3(:,row,l))
+                temp = v_half_to_float_c(w%w3(:,row,l))
                 hb2 = dot_product(xb,temp)
 
                 hb = hb*(1/(1+exp(-hb)))
@@ -549,11 +549,11 @@ contains
                 integer :: row, l
                 real(kind=wp) :: p(3)
 
-                temp = v_half_to_float_lookup(w%wq(:,row,l))
+                temp = v_half_to_float_c(w%wq(:,row,l))
                 p(1) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wk(:,row,l))
+                temp = v_half_to_float_c(w%wk(:,row,l))
                 p(2) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wv(:,row,l))
+                temp = v_half_to_float_c(w%wv(:,row,l))
                 p(3) = dot_product(xb,temp)
 
         end function
@@ -778,7 +778,7 @@ contains
                 logits(:) = 0
 
                 ! convert precision        
-                x = v_half_to_float_lookup(w%token_embedding_table(:,token))
+                x = v_half_to_float_c(w%token_embedding_table(:,token))
 
                 freq_cis_real_row = w%freq_cis_real(:,pos)
                 freq_cis_imag_row = w%freq_cis_imag(:,pos)
@@ -859,7 +859,7 @@ contains
                         ! parallel convert + matmul seems to help
                         !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        temp = v_half_to_float_c(w%wo(:,ix,l))
                         x(ix) = x(ix) + dot_product(xb,temp)
                         !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
@@ -879,7 +879,7 @@ contains
                         ! try convert + matmul here
                         !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
-                        temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
+                        temp2 = v_half_to_float_c(w%w2(:,ix,l))
                         x(ix) = x(ix) + dot_product(hb,temp2)
                         end do
                         !$OMP END PARALLEL DO
@@ -896,11 +896,11 @@ contains
       
       
                 if (shared_weights) then
-                        logits = vm_matmul(x,v_half_to_float_lookup2(w%token_embedding_table))
+                        logits = vm_matmul(x,v_half_to_float_c2(w%token_embedding_table))
                 else
                         !$OMP PARALLEL DO PRIVATE (ix, temp)
                         do ix = 1,p%vocab_size
-                                temp = v_half_to_float_lookup(w%wcls(:,ix))
+                                temp = v_half_to_float_c(w%wcls(:,ix))
                                 logits(ix) = dot_product(x,temp)
                         end do
                         !$OMP END PARALLEL DO
