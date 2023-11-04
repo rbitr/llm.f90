@@ -538,11 +538,11 @@ contains
                 real(kind=wp) :: temp(size(xb))        
                 integer :: row, l
                 real(kind=wp) :: hb, hb2
-                temp = v_half_to_float_c(w%w1(:,row,l))
-                !temp = fp16_to_real32(w%w1(:,row,l))
+                !temp = v_half_to_float_lookup(w%w1(:,row,l))
+                temp = fp16_to_real32(w%w1(:,row,l))
                 hb = dot_product(xb,temp)
-                temp = v_half_to_float_c(w%w3(:,row,l))
-                !temp = fp16_to_real32(w%w3(:,row,l))
+                !temp = v_half_to_float_lookup(w%w3(:,row,l))
+                temp = fp16_to_real32(w%w3(:,row,l))
                 hb2 = dot_product(xb,temp)
 
                 hb = hb*(1/(1+exp(-hb)))
@@ -573,7 +573,7 @@ contains
                 real(kind=wp) :: c, r
                 integer :: i
                 c=0
-                do concurrent (i=1:size(a)) 
+                do concurrent (i=1:size(a)) reduce(+:c)
                         r = fp16_to_real32(b(i))
                         c = c + r*a(i)        
                 end do 
@@ -814,19 +814,19 @@ contains
                         do ix = 1,p%emb_dim
                         !proj = p_proj(xb,ix,l,w)
                         !temp = v_half_to_float_lookup(w%wq(:,row,l))
-                        q(ix) = dot_product(xb,v_half_to_float_c(w%wq(:,ix,l)))
-                        k(ix) = dot_product(xb,v_half_to_float_c(w%wk(:,ix,l)))
+                        !q(ix) = dot_product(xb,v_half_to_float_lookup(w%wq(:,ix,l)))
+                        !k(ix) = dot_product(xb,v_half_to_float_lookup(w%wk(:,ix,l)))
 
-                        v(ix) = dot_product(xb,v_half_to_float_c(w%wv(:,ix,l)))
+                        !v(ix) = dot_product(xb,v_half_to_float_lookup(w%wv(:,ix,l)))
                         !q(ix) = dot_product(xb,fp16_to_real32(w%wq(:,ix,l)))
                         !k(ix) = dot_product(xb,fp16_to_real32(w%wk(:,ix,l)))
 
                         !v(ix) = dot_product(xb,fp16_to_real32(w%wv(:,ix,l)))
 
-                        !q(ix) = v_dot_product(xb,w%wq(:,ix,l))
-                        !k(ix) = v_dot_product(xb,w%wk(:,ix,l))
+                        q(ix) = v_dot_product(xb,w%wq(:,ix,l))
+                        k(ix) = v_dot_product(xb,w%wk(:,ix,l))
 
-                        !v(ix) = v_dot_product(xb,w%wv(:,ix,l))
+                        v(ix) = v_dot_product(xb,w%wv(:,ix,l))
 
                         end do
                         !$OMP END PARALLEL DO
@@ -891,17 +891,17 @@ contains
                         time = time_ms()
                         
                         ! parallel convert + matmul seems to help
-                        !!$OMP PARALLEL DO PRIVATE(ix,temp)
+                        !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        temp = v_half_to_float_c(w%wo(:,ix,l))
-                        !temp = fp16_to_real32(w%wo(:,ix,l))
+                        !temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        temp = fp16_to_real32(w%wo(:,ix,l))
                         x(ix) = x(ix) + dot_product(xb,temp)
-                        !!xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
+                        !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
-                        !!$OMP END PARALLEL DO
+                        !$OMP END PARALLEL DO
                         
                         !xb = xb/sqrt(dot_product(x,x)/size(x)+1e-5)
-                        !x = x + matmul(xb, fp16_to_real32(w%wo(:,:,l)))
+                        !x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
@@ -912,14 +912,14 @@ contains
                         !$OMP END PARALLEL DO
                         
                         ! try convert + matmul here
-                        !!$OMP PARALLEL DO PRIVATE(ix, temp2)
+                        !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
-                        temp2 = v_half_to_float_c(w%w2(:,ix,l))
-                        !temp2 = fp16_to_real32(w%w2(:,ix,l))
+                        !temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
+                        temp2 = fp16_to_real32(w%w2(:,ix,l))
                         x(ix) = x(ix) + dot_product(hb,temp2)
                         end do
-                        !!$OMP END PARALLEL DO
-                        !xb = matmul(hb,v_half_to_float_c2(w%w2(:,:,l)))
+                        !$OMP END PARALLEL DO
+                        !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
                         !x = x + xb
 
                         s%times(4) = s%times(4) + (time_ms() - time)
