@@ -129,6 +129,15 @@ module f32_convert
         implicit none
 
         interface
+                subroutine c_half_to_float_array(in_array, out_array, si) bind(C, name="half_to_float_array_simd")
+            use iso_c_binding
+                         !import c_double, c_int
+            integer(c_int16_t), intent(in) :: in_array(*)
+            real(c_float), intent(out) :: out_array(*)
+            integer(c_int), value :: si
+        end subroutine c_half_to_float_array
+
+
                 pure function float_to_half_c(x) bind(C, name="float_to_half")
                         use iso_c_binding
                         real(c_float), value :: x
@@ -164,7 +173,7 @@ program llama2
         use arg_parse
         use omp_lib
         use f32_convert, only: float_to_half_c, half_to_float_c, build_f32_lookup_table,&
-                &f32_lookup_table
+                &f32_lookup_table, c_half_to_float_array
 
         implicit none
 
@@ -615,11 +624,12 @@ contains
                 integer(2), intent(in) :: h(:)
                 real(kind=wp) :: v_half_to_float_c (size(h))
                 integer :: i
-                !$OMP PARALLEL DO PRIVATE(i)
-                do i=1,size(h)
-                v_half_to_float_c(i) = half_to_float_c(h(i))
-                end do 
-                !$OMP END PARALLEL DO
+                call c_half_to_float_array(h,v_half_to_float_c,size(h))
+                !!$OMP PARALLEL DO PRIVATE(i)
+                !do i=1,size(h)
+                !v_half_to_float_c(i) = half_to_float_c(h(i))
+                !end do 
+                !!$OMP END PARALLEL DO
         end function
        
         function v_half_to_float_lookup(h)
