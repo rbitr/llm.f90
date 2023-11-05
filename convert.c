@@ -1,4 +1,4 @@
-/* code in this file from GGML: https://github.com/ggerganov/llama.cpp/blob/master/ggml-impl.h
+/* some code in this file from GGML: https://github.com/ggerganov/llama.cpp/blob/master/ggml-impl.h
 
 MIT License
 
@@ -24,7 +24,7 @@ SOFTWARE.
 */
 //#include <fp16.h>
 #include <stdint.h>
-
+#include <immintrin.h>
 
 
 uint16_t float_to_half(float x) {
@@ -75,4 +75,20 @@ float half_to_float(uint16_t h) {
 	//return fp16_ieee_to_fp32_value(h);
 }
 
+void half_to_float_array_simd(const uint16_t* input, float* output, int size) {
+    for (size_t i = 0; i < size; i += 8) {
+        // Load 8 half-precision floats into __m128i
+        __m128i half_data = _mm_loadu_si128((__m128i const*)(input + i));
+
+        // Convert lower 4 half-precision floats to single-precision
+        __m128 single_lo = _mm_cvtph_ps(half_data);
+
+        // Convert upper 4 half-precision floats to single-precision
+        __m128 single_hi = _mm_cvtph_ps(_mm_unpackhi_epi64(half_data, half_data));
+
+        // Store the results in the output array
+        _mm_storeu_ps(output + i, single_lo);
+        _mm_storeu_ps(output + i + 4, single_hi);
+    }
+}
 
