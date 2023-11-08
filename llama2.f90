@@ -32,7 +32,8 @@ module weight_module
         end type TransformerWeights
 
         type Config
-                INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+                integer :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+                integer :: kv_head_size
         end type Config
 
         type RunState
@@ -173,7 +174,7 @@ program llama2
         INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
         type(TransformerWeights) :: weights
         logical :: shared_weights
-        integer :: head_size, tmp
+        integer :: head_size, kv_head_size, tmp
         type(config) :: conf
         type(RunState) :: s
         real(kind=wp), allocatable :: logits(:)
@@ -217,6 +218,9 @@ program llama2
                 ! config
                 read(5) emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
                 
+                head_size = emb_dim / n_heads
+                kv_head_size = n_kv_heads * head_size
+                
                 if (verbose) then
                         print *, "Embedding dimension: ", emb_dim
                         print *, "Hidden dimension: ", hidden_dim
@@ -225,6 +229,8 @@ program llama2
                         print *, "kv Heads: ", n_kv_heads
                         print *, "Vocabulary Size: ", vocab_size
                         print *, "Sequence Length: ", seq_len
+                        print *, "Head Size: ", head_size
+                        print *, "kv Head Size: ", kv_head_size
 
                 end if 
 
@@ -272,7 +278,9 @@ program llama2
                         print *, "loaded wq weights:", size(weights%wq)
                 end if
                 
-                allocate(weights%wk(emb_dim,emb_dim,n_layers))
+                
+
+                allocate(weights%wk(emb_dim,kv_head_size,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
@@ -286,7 +294,7 @@ program llama2
                         print *, "loaded wk weights:", size(weights%wk)
                 end if
                 
-                allocate(weights%wv(emb_dim,emb_dim,n_layers))
+                allocate(weights%wv(emb_dim,kv_head_size,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
@@ -372,7 +380,7 @@ program llama2
                         print *, "loaded rms_final weights:", size(weights%rms_final_weight)
                 end if
 
-                head_size = emb_dim / n_heads
+                !head_size = emb_dim / n_heads
 
                 allocate(weights%freq_cis_real(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
@@ -422,11 +430,12 @@ program llama2
         conf%n_kv_heads = n_kv_heads
         conf%vocab_size = vocab_size
         conf%seq_len = seq_len
+        conf%kv_head_size = kv_head_size
 
         ! state dict
         allocate(s%att(seq_len,n_heads))
-        allocate(s%key_cache(emb_dim,seq_len,n_layers))
-        allocate(s%value_cache(emb_dim,seq_len,n_layers))
+        allocate(s%key_cache(kv_head_size,seq_len,n_layers))
+        allocate(s%value_cache(kv_head_size,seq_len,n_layers))
 
         ! not needed
         s%att(:,:) = 0
@@ -751,11 +760,12 @@ contains
                 ! embeddings
                 real(kind=wp) :: proj(3)
                 real(kind=wp) :: q(emb_dim)
-                real(kind=wp) :: k(emb_dim)
-                real(kind=wp) :: v(emb_dim)
+                real(kind=wp) :: k(kv_head_size)
+                real(kind=wp) :: v(kv_head_size)
       
                 ! position encoding  
-                real(kind=wp) :: q0, q1, k0, k1, fcr, fci
+                real(kind=wp) :: q0, q1, k0, k1, fcr, fci, v0, v1, freq, rval
+                integer :: head_dim
 
                 ! attention
                 real(kind=wp) :: q_t(p%emb_dim/p%n_heads)
@@ -763,6 +773,7 @@ contains
                 real(kind=wp) :: v_t(p%emb_dim/p%n_heads)
                 real(kind=wp) :: xbh(p%emb_dim/p%n_heads)
                 real(kind=wp) :: a
+                integer :: kv_mul
 
                 ! fc layers
                 real(kind=wp) :: hb(hidden_dim)
@@ -788,34 +799,43 @@ contains
                         ! embed and project
                         time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
-                        !$OMP PARALLEL DO PRIVATE(ix,proj)
+                        !!$OMP PARALLEL DO PRIVATE(ix)
                         do ix = 1,p%emb_dim
-                        proj = p_proj(xb,ix,l,w)
-                        q(ix) = proj(1)
-                        k(ix) = proj(2)
-                        v(ix) = proj(3)
+                        !temp = v_half_to_float_lookup(w%wq(:,row,l))
+                        q(ix) = dot_product(xb,v_half_to_float_lookup(w%wq(:,ix,l)))
+                        end do
+                        !!$OMP END PARALLEL DO
+                        !$OMP PARALLEL DO PRIVATE(ix,proj)
+                        do ix = 1,p%kv_head_size
+                        !proj = p_proj(xb,ix,l,w)
+                        !q(ix) = proj(1)
+                        k(ix) = dot_product(xb,v_half_to_float_lookup(w%wk(:,ix,l)))
+                        v(ix) = dot_product(xb,v_half_to_float_lookup(w%wv(:,ix,l)))
                         end do
                         !$OMP END PARALLEL DO
                         s%times(1) = s%times(1) + (time_ms()-time)
                         ! position encoding
         
                         time = time_ms()
-                        do h = 0,(p%n_heads-1)
-                                do i = 1,head_size,2
-
-                                q0 = q(h*head_size+i)  
-                                q1 = q(h*head_size+i+1)
-                                k0 = k(h*head_size+i)
-                                k1 = k(h*head_size+i+1)
-                                fcr = freq_cis_real_row((i-1)/2+1)
-                                fci = freq_cis_imag_row((i-1)/2+1)
-                                q(h*head_size+i) = q0 * fcr - q1 * fci
-                                q(h*head_size+i+1) = q0 * fci + q1 * fcr
-                                k(h*head_size+i) = k0 * fcr - k1 * fci
-                                k(h*head_size+i+1) = k0 * fci + k1 * fcr
-          
-                                end do
+                        ! check that this doens't add any time
+                        do i=1,p%emb_dim,2
+                                head_dim = mod(i,head_size)
+                                freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / head_size))
+                                rval = pos * freq
+                                fcr = cos(rval)
+                                fci = sin(rval)
+                                q0 = q(i)
+                                q1 = q(i+1)
+                                q(i) = q0 * fcr - q1 * fci
+                                q(i+1) = q0 * fci + q1 * fcr
+                                if (i<kv_head_size) then
+                                        k0 = k(i)
+                                        k1 = k(i+1)
+                                        k(i) = k0 * fcr - k1 * fci
+                                        k(i+1) = k0 * fci + k1 * fcr
+                                end if
                         end do
+                        
                         s%times(2) = s%times(2) + (time_ms()-time)
 
                         ! cache k and v for this position
@@ -826,6 +846,8 @@ contains
                         
                         ! multi head attention and fc layers
                         time = time_ms()
+                        
+                        kv_mul = p%n_heads / p%n_kv_heads
                         !$OMP PARALLEL DO PRIVATE(h, q_t, k_t, xbh, t, v_t, a)
                         do h = 0,(p%n_heads-1)        
                         ! alternately uncomment below to make explicitly concurrent 
@@ -834,7 +856,9 @@ contains
                         q_t = q((h*head_size+1):((h+1)*head_size))
           
                         do t = 1,(pos)
-                        k_t = s%key_cache((h*head_size+1):((h+1)*head_size),t,l)
+                        !k_t = s%key_cache((h*head_size+1):((h+1)*head_size),t,l)
+                        ! for shared heads 
+                        k_t = s%key_cache(((h/kv_mul)*head_size+1):(((h+1)/kv_mul)*head_size),t,l)
                         s%att(t,h+1) = dot_product(q_t,k_t)/sqrt(real(head_size,wp))
                         end do  
           
@@ -843,7 +867,8 @@ contains
                         xbh(:) = 0  
                         
                         do t = 1,(pos) 
-                        v_t = s%value_cache((h*head_size+1):((h+1)*head_size),t,l)      
+                        !v_t = s%value_cache((h*head_size+1):((h+1)*head_size),t,l)      
+                        v_t = s%value_cache(((h/kv_mul)*head_size+1):(((h+1)/kv_mul)*head_size),t,l) 
                         a = s%att(t,h+1)
                         xbh = xbh + a*v_t  
                         end do     
