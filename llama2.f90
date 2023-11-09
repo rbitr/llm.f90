@@ -1,5 +1,4 @@
 ! llama2.f90
-! implementation of a toy llama model
 
 ! set precision of reals (here default which is 4 byte)
 module precision_module
@@ -17,21 +16,10 @@ module weight_module
                 real(kind=wp), allocatable :: token_embedding_table(:,:)
                 real(kind=wp), allocatable :: rms_att_weight(:,:)
                 real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-                !real(kind=wp), allocatable :: wq(:,:,:)
-                !real(kind=wp), allocatable :: wk(:,:,:)
-                !real(kind=wp), allocatable :: wv(:,:,:)      
                 real(kind=wp), allocatable :: wqkv(:,:,:)
                 real(kind=wp), allocatable :: wo(:,:,:)
-                real(kind=wp), allocatable :: w1(:,:,:)       
+                real(kind=wp), allocatable :: w13(:,:,:)
                 real(kind=wp), allocatable :: w2(:,:,:)
-                real(kind=wp), allocatable :: w3(:,:,:)
-                !integer(2), allocatable :: wq(:,:,:)
-                !integer(2), allocatable :: wk(:,:,:)
-                !integer(2), allocatable :: wv(:,:,:)
-                !integer(2), allocatable :: wo(:,:,:)
-                !integer(2), allocatable :: w1(:,:,:)
-                !integer(2), allocatable :: w2(:,:,:)
-                !integer(2), allocatable :: w3(:,:,:)
                 real(kind=wp), allocatable :: rms_final_weight(:)
                 real(kind=wp), allocatable :: freq_cis_real(:,:)
                 real(kind=wp), allocatable :: freq_cis_imag(:,:)
@@ -133,46 +121,13 @@ module arg_parse
 end module arg_parse
 
 
-module f32_convert
-        use iso_c_binding
-        implicit none
-
-        interface
-                pure function float_to_half_c(x) bind(C, name="float_to_half")
-                        use iso_c_binding
-                        real(c_float), value :: x
-                        integer(c_int16_t) :: float_to_half_c
-                end function float_to_half_c
-
-                pure function half_to_float_c(h) bind(C, name="half_to_float")
-                        use iso_c_binding
-                        integer(c_int16_t), value :: h
-                        real(c_float) :: half_to_float_c
-                end function half_to_float_c
-        end interface
-
-        real :: f32_lookup_table(-32768:32766)
-        integer(2) :: v
-
-        contains
-
-                subroutine build_f32_lookup_table
-                        do v = -32768,32766
-                        f32_lookup_table(v) = half_to_float_c(v)
-                        end do
-        
-                end subroutine
-
-end module f32_convert
 
 program llama2 
         use iso_c_binding
         use precision_module
         use weight_module
         use arg_parse
-        use omp_lib
-        use f32_convert, only: float_to_half_c, half_to_float_c, build_f32_lookup_table,&
-                &f32_lookup_table
+        !use omp_lib
 
         implicit none
 
@@ -198,8 +153,6 @@ program llama2
         real(kind=wp), allocatable :: freq_buf(:)
         real(kind=wp), allocatable :: temp1(:), temp2(:,:), temp3(:,:,:)
         integer :: l
-        ! anything that has n_layers, load in one layer at a time
-        !, temp3(:,:,:)
 
         !for the tokens
 
@@ -229,14 +182,6 @@ program llama2
 
         verbose = arg_values%verbose
         
-        ! hard code config
-        !emb_dim = 2048
-        !hidden_dim = 5632
-        !n_layers = 22
-        !n_heads = 32
-        !n_kv_heads = 4
-        !vocab_size = -32000
-        !seq_len = 2048
 
         ! open the model file 
         open(UNIT=5, FILE=arg_values%model_file, FORM="UNFORMATTED",&
@@ -293,46 +238,6 @@ program llama2
                 end if
 
 
-                !!!!!!!!!
-                ! separate qkv
-                !!!!!!!!!
-                !allocate(weights%wq(emb_dim,emb_dim,n_layers))
-                !!allocate(temp2(emb_dim,emb_dim))
-                !do l = 1,n_layers
-                !!allocate(temp2(emb_dim,emb_dim,n_layers))
-                !read(5) weights%wq(:,:,l)
-                !!weights%wq(:,:,l) = v_float_to_half_c2(temp2)
-                !end do
-                !!deallocate(temp2)
-
-                !if (verbose) then
-                !        print *, "loaded wq weights:", size(weights%wq)
-                !end if
-                
-                
-
-                !allocate(weights%wk(emb_dim,kv_head_size,n_layers))
-                !!allocate(temp2(emb_dim,emb_dim))
-                !do l = 1,n_layers
-                !!allocate(temp2(emb_dim,emb_dim,n_layers))
-                !read(5) weights%wk(:,:,l)
-                !!weights%wk(:,:,l) = v_float_to_half_c2(temp2)
-                !end do
-                !!deallocate(temp2)
-
-
-                !if (verbose) then
-                !        print *, "loaded wk weights:", size(weights%wk)
-                !end if
-                
-                !allocate(weights%wv(emb_dim,kv_head_size,n_layers))
-                !!allocate(temp2(emb_dim,emb_dim))
-                !do l = 1,n_layers
-                !!allocate(temp2(emb_dim,emb_dim,n_layers))
-                !read(5) weights%wv(:,:,l)
-                !!weights%wv(:,:,l) = v_float_to_half_c2(temp2)
-                !end do
-                !!deallocate(temp2)
 
                 !!!!!!!!!
                 ! single qkv
@@ -405,16 +310,16 @@ program llama2
                         print *, "loaded rms ffn  weights:", size(weights%rms_ffn_weight)
                 end if
 
-                allocate(weights%w1(emb_dim,hidden_dim,n_layers))
+                allocate(weights%w13(emb_dim,2*hidden_dim,n_layers))
                 !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
-                read(5) weights%w1(:,:,l)
+                read(5) weights%w13(:,1:hidden_dim,l)
                 !weights%w1(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded w1 weights:", size(weights%w1)
+                        print *, "loaded w1 weights:", size(weights%w13(:,1:hidden_dim,:))
                 end if
 
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
@@ -429,16 +334,16 @@ program llama2
                         print *, "loaded w2 weights:", size(weights%w2)
                 end if
 
-                allocate(weights%w3(emb_dim,hidden_dim,n_layers))
+                !allocate(weights%w3(emb_dim,hidden_dim,n_layers))
                 !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
-                read(5) weights%w3(:,:,l)
+                read(5) weights%w13(:,(hidden_dim+1):,l)
                 !weights%w3(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded w3 weights:", size(weights%w3)
+                        print *, "loaded w3 weights:", size(weights%w13(:,hidden_dim,:))
                 end if
 
                 allocate(weights%rms_final_weight(emb_dim))
@@ -546,8 +451,6 @@ program llama2
 
         ! __main__ part
 
-        ! build lookup table
-        call build_f32_lookup_table
         temperature = arg_values%temperature
         prompt = arg_values%prompt
 
@@ -604,150 +507,7 @@ program llama2
 ! functions 
 contains 
 
-        ! group the matmuls from MLP layers + nonlinearity together
-        function p_mlp(xb,row,l, w) result(hb)
-                real(kind=wp) :: xb(:)
-                type(TransformerWeights), intent(in) :: w
-                !real(kind=wp) :: temp(size(xb))        
-                integer :: row, l
-                real(kind=wp) :: hb, hb2
-                !temp = v_half_to_float_lookup(w%w1(:,row,l))
-                hb = dot_product(xb,w%w1(:,row,l))
-                !temp = v_half_to_float_lookup(w%w3(:,row,l))
-                hb2 = dot_product(xb,w%w3(:,row,l))
 
-                hb = hb*(1/(1+exp(-hb)))
-
-                hb = hb*hb2
-        end function
-       
-        ! group up front projection matmuls
-!        function p_proj(xb,row,l,w) result(p)
-!                real(kind=wp) :: xb(:)
-!                type(TransformerWeights), intent(in) :: w
-!                real(kind=wp) :: temp(size(xb))
-!                integer :: row, l
-!                real(kind=wp) :: p(3)
-!
-!                temp = v_half_to_float_lookup(w%wq(:,row,l))
-!                p(1) = dot_product(xb,temp)
-!                temp = v_half_to_float_lookup(w%wk(:,row,l))
-!                p(2) = dot_product(xb,temp)
-!                temp = v_half_to_float_lookup(w%wv(:,row,l))
-!                p(3) = dot_product(xb,temp)
-
-!        end function
-
-        function vm_matmul(a,b) result(c)
-                real(kind=wp) :: a(:)
-                real(kind=wp) :: b(:,:)
-                integer, allocatable :: s(:)
-                real(kind=wp), allocatable :: c(:)
-                integer :: i,j
-                real(kind=wp) :: val
-
-                s = shape(b)
-                allocate(c(s(2)))
-                c (:) = 0
-
-                !$OMP PARALLEL DO
-                do i=1,s(2)
-                        val = 0.0
-                        !!$OMP PARALLEL DO PRIVATE(j) REDUCTION(+:val)
-                        do j=1,size(a)
-                                val = val + a(j)*b(j,i)
-                        end do
-                        !!$OMP END PARALLEL DO
-                        c(i) = val
-
-                end do
-                !$OMP END PARALLEL DO
-
-
-
-
-        end function
-
-        !with loops
-        function v_half_to_float_c(h)
-                integer(2), intent(in) :: h(:)
-                real(kind=wp) :: v_half_to_float_c (size(h))
-                integer :: i
-                !$OMP PARALLEL DO PRIVATE(i)
-                do i=1,size(h)
-                v_half_to_float_c(i) = half_to_float_c(h(i))
-                end do 
-                !$OMP END PARALLEL DO
-        end function
-       
-        function v_half_to_float_lookup(h)
-                integer(2), intent(in) :: h(:)
-                real(kind=wp) :: v_half_to_float_lookup (size(h))
-                integer :: i
-                !$OMP PARALLEL DO PRIVATE(i)
-                do i=1,size(h)
-                v_half_to_float_lookup(i) = f32_lookup_table(h(i))
-                end do
-                !$OMP END PARALLEL DO
-        end function
-
-        pure function v_float_to_half_c(r)
-                real(kind=wp), intent(in) :: r(:)
-                integer(2) :: v_float_to_half_c (size(r))
-                integer :: i
-                do i = 1,size(r)
-                v_float_to_half_c(i) = float_to_half_c(r(i))
-                end do
-        end function
-
-        function v_half_to_float_c2(h)
-                integer(2), intent(in) :: h(:,:)
-                real(kind=wp) :: v_half_to_float_c2(size(h,1), size(h,2))
-                integer :: i,j
-                !$OMP PARALLEL DO COLLAPSE (2)
-                do j = 1,size(h,2)
-                        do i = 1,size(h,1)
-                            v_half_to_float_c2(i,j) = half_to_float_c(h(i,j))
-                        end do
-                end do 
-                !$OMP END PARALLEL DO   
-        end function
-
-        function v_half_to_float_lookup2(h)
-                integer(2), intent(in) :: h(:,:)
-                real(kind=wp) :: v_half_to_float_lookup2(size(h,1), size(h,2))
-                integer :: i,j
-                !$OMP PARALLEL DO COLLAPSE (2)
-                do j = 1,size(h,2)
-                        do i = 1,size(h,1)
-                            v_half_to_float_lookup2(i,j) = f32_lookup_table(h(i,j))
-                        end do
-                end do
-                !$OMP END PARALLEL DO   
-        end function
-
-
-
-        function v_float_to_half_c2(r)
-                real(kind=wp), intent(in) :: r(:,:)
-                integer(2) :: v_float_to_half_c2(size(r,1), size(r,2))
-                integer :: i,j
-                !$OMP PARALLEL DO COLLAPSE (2)
-                do j = 1,size(r,2)
-                        do i = 1,size(r,1)
-                            v_float_to_half_c2(i,j) = float_to_half_c(r(i,j))
-                        end do
-                end do
-                !$OMP END PARALLEL DO
-        end function
-
-        pure function v_float_to_half_c3(r)
-                real(kind=wp), intent(in) :: r(:,:,:)
-                integer(2) :: v_float_to_half_c3(size(r,1), size(r,2), size(r,3))
-                v_float_to_half_c3 = reshape(v_float_to_half_c(&
-                        &reshape(r, [size(r)])), [size(r,1), size(r,2), size(r,3)])
-        end function
-        
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
                 integer(4) :: ms
@@ -812,8 +572,6 @@ contains
 
         end function 
 
-      ! where the action isa
-      ! see https://jaykmody.com/blog/gpt-from-scratch/ and ref therin for how attention works
         function transformer(token, pos, p, s, w) result(logits)
                 integer, intent(in) :: token, pos
                 type(Config), intent(in) :: p
@@ -829,8 +587,7 @@ contains
                 real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
                 ! embeddings
-                real(kind=wp) :: proj(3)
-                real(kind=wp), target :: qkv(emb_dim+2*kv_head_size)
+                real(kind=wp), target :: qkv(p%emb_dim+2*p%kv_head_size)
                 real(kind=wp), pointer :: q(:), k(:), v(:)
                 !real(kind=wp) :: q(emb_dim)
                 !real(kind=wp) :: k(kv_head_size)
@@ -849,9 +606,11 @@ contains
                 integer :: kv_mul
 
                 ! fc layers
-                real(kind=wp) :: hb(hidden_dim)
-                real(kind=wp) :: hb2(hidden_dim)
-      
+                !real(kind=wp) :: hb(hidden_dim)
+                !real(kind=wp) :: hb2(hidden_dim)
+                real(kind=wp), target :: hb13(2*p%hidden_dim)
+                real(kind=wp), pointer :: hb(:), hb2(:) 
+
                 ! counters etc
                 integer :: l, i, h, t, head_size, ix
                 real(kind=wp) :: time
@@ -864,44 +623,20 @@ contains
                 ! convert precision        
                 x = w%token_embedding_table(:,token)
 
-                !freq_cis_real_row = w%freq_cis_real(:,pos)
-                !freq_cis_imag_row = w%freq_cis_imag(:,pos)
 
                 do l = 1,p%n_layers
                         
                         ! embed and project
                         time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
-                        !!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! With dot products 
-                        !!!!!!!!!!!!!!!!!!!!!!!!!
-                        !!!$OMP PARALLEL DO PRIVATE(ix)
-                        !do ix = 1,p%emb_dim
-                        !!!temp = v_half_to_float_lookup(w%wq(:,row,l))
-                        !q(ix) = dot_product(xb,(w%wq(:,ix,l)))
-                        !end do
-                        !!!$OMP END PARALLEL DO
-                        !!$OMP PARALLEL DO PRIVATE(ix,proj)
-                        !do ix = 1,p%kv_head_size
-                        !!proj = p_proj(xb,ix,l,w)
-                        !!q(ix) = proj(1)
-                        !k(ix) = dot_product(xb,(w%wk(:,ix,l)))
-                        !v(ix) = dot_product(xb,(w%wv(:,ix,l)))
-                        !end do
-                        !!$OMP END PARALLEL DO
+                        
                         do ix = 1,size(qkv)
                         qkv(ix) = dot_product(xb,(w%wqkv(:,ix,l)))
                         end do
-                        !!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! With matmul
-                        !!!!!!!!!!!!!!!!!!!!!!!!!
-                        !qkv = matmul(xb,w%wqkv(:,:,l))
+                        
                         q => qkv(1:emb_dim)
                         k => qkv((emb_dim+1):(emb_dim+kv_head_size))
                         v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
-                        !q = matmul(xb,(w%wq(:,:,l)))
-                        !k = matmul(xb,(w%wk(:,:,l)))
-                        !v = matmul(xb,(w%wv(:,:,l)))
                         
                         
                         s%times(1) = s%times(1) + (time_ms()-time)
@@ -939,10 +674,8 @@ contains
                         time = time_ms()
                         
                         kv_mul = p%n_heads / p%n_kv_heads
-                        !$OMP PARALLEL DO PRIVATE(h, q_t, k_t, xbh, t, v_t, a)
+                        
                         do h = 0,(p%n_heads-1)        
-                        ! alternately uncomment below to make explicitly concurrent 
-                        !do concurrent (h =1:(p%n_heads-1))
 
                         q_t = q((h*head_size+1):((h+1)*head_size))
           
@@ -967,46 +700,28 @@ contains
                         xb((h*head_size+1):((h+1)*head_size)) = xbh
                        
                         end do  
-                        !$OMP END PARALLEL DO
                         s%times(3) = s%times(3) + (time_ms() - time)
 
                         time = time_ms()
                         
-                        ! parallel convert + matmul seems to help
-                        !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        !temp = (w%wo(:,ix,l))
                         x(ix) = x(ix) + dot_product(xb,w%wo(:,ix,l))
-                        !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
-                        !$OMP END PARALLEL DO
                         
-                        !xb = xb/sqrt(dot_product(x,x)/size(x)+1e-5)
-                        !x = x + vm_matmul(xb, v_half_to_float_lookup2(w%wo(:,:,l)))
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
-                        !$OMP PARALLEL DO PRIVATE(ix)
-                        do ix = 1,p%hidden_dim
-                        !hb(ix) = p_mlp(xb,ix,l,w) 
-                        hb(ix) = dot_product(xb,w%w1(:,ix,l))
-                        hb2(ix) = dot_product(xb,w%w3(:,ix,l))
-                        !hb(ix) = hb(ix)*(1/(1+exp(-hb(ix))))
-                        !hb(ix) = hb(ix)*hb2(ix)
+                        do ix = 1,size(hb13)
+                        hb13(ix) = dot_product(xb,w%w13(:,ix,l))
                         end do
-                        !$OMP END PARALLEL DO
+                        hb => hb13(1:hidden_dim)
+                        hb2 => hb13((hidden_dim+1):(2*hidden_dim))
                         hb = hb*(1/(1+exp(-hb)))
                         hb = hb*hb2
 
-                        ! try convert + matmul here
-                        !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
-                        !temp2 = (w%w2(:,ix,l))
                         x(ix) = x(ix) + dot_product(hb,w%w2(:,ix,l))
                         end do
-                        !$OMP END PARALLEL DO
-                        !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
-                        !x = x + xb
 
                         s%times(4) = s%times(4) + (time_ms() - time)
 
@@ -1017,17 +732,13 @@ contains
 
       
       
-                if (shared_weights) then
-                        logits = vm_matmul(x,(w%token_embedding_table))
-                else
-                        !$OMP PARALLEL DO PRIVATE (ix, temp)
+                !if (shared_weights) then
+                !        logits = vm_matmul(x,(w%token_embedding_table))
+                !else
                         do ix = 1,p%vocab_size
-                                !temp = (w%wcls(:,ix))
                                 logits(ix) = dot_product(x,w%wcls(:,ix))
                         end do
-                        !$OMP END PARALLEL DO
-                        !logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
-                end if
+                !end if
                 s%times(5) = s%times(5) + (time_ms() - time)
 
         end function
