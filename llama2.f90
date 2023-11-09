@@ -975,8 +975,8 @@ contains
                         ! parallel convert + matmul seems to help
                         !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        temp = (w%wo(:,ix,l))
-                        x(ix) = x(ix) + dot_product(xb,temp)
+                        !temp = (w%wo(:,ix,l))
+                        x(ix) = x(ix) + dot_product(xb,w%wo(:,ix,l))
                         !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
                         !$OMP END PARALLEL DO
