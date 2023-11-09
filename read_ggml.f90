@@ -46,7 +46,7 @@ module read_ggml
         
         type(ggml_tensor_info), allocatable :: tensors(:)
         logical :: verbose
-        integer :: file_pos
+        !integer :: file_pos
         integer(8) :: tensor_count
 contains
         subroutine load_weights(filename, w, c, v)
@@ -58,7 +58,7 @@ contains
         integer(8) :: kv_pairs
         !class(*), allocatable :: demo
         integer :: max_len = 64
-        integer :: i, j, val_type,  alignment, deficit 
+        integer :: i, j, val_type,file_pos,  alignment, deficit 
         integer(4) :: num_layers, emb_length, context_length, head_count, ffn_length, kv_heads, vocab_size
         type(multi_type), allocatable :: values(:)
         type(multi_type) :: multi_temp
@@ -182,9 +182,9 @@ contains
                 end do
         end if
 
-                !inquire(unit=5,pos=file_pos)
+                inquire(unit=5,pos=file_pos)
 
-                !print *, "data offset", file_pos
+                print *, "data offset", file_pos
 
                 !read(5) f16
                
@@ -214,7 +214,7 @@ contains
                 print *, "kv head Size ", kv_head_size
 
                 t0 = tensor_by_name("token_embd.weight")
-                temp_gt = read_layer(5,t0)
+                temp_gt = read_layer(5,t0,file_pos)
 
                 !call write_tensor(8,temp_gt)
                 w%token_embedding_table = temp_gt%f322d
@@ -222,13 +222,16 @@ contains
                 if (verbose) then
                         print *, "loaded embedding weights:", size(w%token_embedding_table)
                 end if
-
+                print *, temp_gt%ttype
+                print *, temp_gt%ndims
+                print *, w%token_embedding_table(1:10,1)
+                print *, "embed sum: ", sum(w%token_embedding_table(1:10,1:10))
 
                 allocate(w%rms_att_weight(emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_norm.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! should be f32
                         !call write_tensor(8,temp_gt)
                         w%rms_att_weight(:,i) = temp_gt%f321d
@@ -242,7 +245,7 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_q.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%wqkv(:,1:emb_length,i) = temp_gt%f322d
@@ -256,7 +259,7 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_k.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16 
                         !call write_tensor(8,temp_gt)
                         w%wqkv(:,(emb_length+1):(emb_length+kv_head_size),i) = temp_gt%f322d
@@ -265,17 +268,20 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_v.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%wqkv(:,(emb_length+kv_head_size+1):(emb_length+2*kv_head_size),i) = temp_gt%f322d
                 end do
 
+                print *, "qkv sum: ", sum(w%wqkv)
+
+
                 allocate(w%wo(emb_length,emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_output.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%wo(:,:,i) = temp_gt%f322d
@@ -285,7 +291,7 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_norm.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f32
                         !call write_tensor(8,temp_gt)
                         w%rms_ffn_weight(:,i) = temp_gt%f321d
@@ -295,7 +301,7 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_gate.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%w13(:,1:ffn_length,i) = temp_gt%f322d
@@ -305,7 +311,7 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_down.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%w2(:,:,i) = temp_gt%f322d
@@ -314,14 +320,14 @@ contains
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_up.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
                         w%w13(:,(ffn_length+1):,i) = temp_gt%f322d
                 end do
 
                 t0 = tensor_by_name("output_norm.weight")
-                temp_gt = read_layer(5,t0)
+                temp_gt = read_layer(5,t0,file_pos)
                 ! f32
                 !call write_tensor(8,temp_gt)
                 w%rms_final_weight = temp_gt%f321d
@@ -338,7 +344,7 @@ contains
                 ! cos and sin of the above are the cos/sin respectively (f32)
 
                 t0 = tensor_by_name("output.weight")
-                temp_gt = read_layer(5,t0)
+                temp_gt = read_layer(5,t0,file_pos)
                 ! f16
                 !call write_tensor(8,temp_gt)
                 w%wcls = temp_gt%f322d
@@ -512,7 +518,7 @@ contains
                 if (verbose) then
                         write(*,"(A,A26)",advance="no") "reading",layer%tname 
                 end if
-                call fseek(handle,layer%offset+file_pos,0)
+                !call fseek(handle,layer%offset+file_pos,0)
                 allocate(d(prod(layer%dims)))
                 read(handle) d
                 if (verbose) then
@@ -521,10 +527,11 @@ contains
 
         end function 
 
-        function read_layer(handle, layer) result(d)
+        function read_layer(handle, layer,file_pos) result(d)
                 integer :: handle
                 type(ggml_tensor_info) :: layer
                 type(generic_tensor) :: d
+                integer :: file_pos
                 !integer(2), allocatable :: d(:)
                 if (verbose) then
                         write(*,"(A,A26)",advance="no") "reading",layer%tname
