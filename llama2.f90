@@ -14,20 +14,28 @@ module weight_module
         private wp
 
         type TransformerWeights
-                integer(2), allocatable :: token_embedding_table(:,:)
+                real(kind=wp), allocatable :: token_embedding_table(:,:)
                 real(kind=wp), allocatable :: rms_att_weight(:,:)
                 real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-                integer(2), allocatable :: wq(:,:,:)
-                integer(2), allocatable :: wk(:,:,:)
-                integer(2), allocatable :: wv(:,:,:)
-                integer(2), allocatable :: wo(:,:,:)
-                integer(2), allocatable :: w1(:,:,:)
-                integer(2), allocatable :: w2(:,:,:)
-                integer(2), allocatable :: w3(:,:,:)
+                !real(kind=wp), allocatable :: wq(:,:,:)
+                !real(kind=wp), allocatable :: wk(:,:,:)
+                !real(kind=wp), allocatable :: wv(:,:,:)      
+                real(kind=wp), allocatable :: wqkv(:,:,:)
+                real(kind=wp), allocatable :: wo(:,:,:)
+                real(kind=wp), allocatable :: w1(:,:,:)       
+                real(kind=wp), allocatable :: w2(:,:,:)
+                real(kind=wp), allocatable :: w3(:,:,:)
+                !integer(2), allocatable :: wq(:,:,:)
+                !integer(2), allocatable :: wk(:,:,:)
+                !integer(2), allocatable :: wv(:,:,:)
+                !integer(2), allocatable :: wo(:,:,:)
+                !integer(2), allocatable :: w1(:,:,:)
+                !integer(2), allocatable :: w2(:,:,:)
+                !integer(2), allocatable :: w3(:,:,:)
                 real(kind=wp), allocatable :: rms_final_weight(:)
                 real(kind=wp), allocatable :: freq_cis_real(:,:)
                 real(kind=wp), allocatable :: freq_cis_imag(:,:)
-                integer(2), allocatable :: wcls(:,:)
+                real(kind=wp), allocatable :: wcls(:,:)
 
         end type TransformerWeights
 
@@ -171,7 +179,16 @@ program llama2
 
         
         ! weights and states
-        INTEGER :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+        integer :: dummy(7)
+        !integer :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+        integer, parameter :: emb_dim = 2048
+        integer, parameter :: hidden_dim = 5632
+        integer, parameter :: n_layers = 22
+        integer, parameter :: n_heads = 32
+        integer, parameter :: n_kv_heads = 4
+        integer, parameter :: vocab_size = 32000
+        integer :: seq_len = 2048
+
         type(TransformerWeights) :: weights
         logical :: shared_weights
         integer :: head_size, kv_head_size, tmp
@@ -211,13 +228,23 @@ program llama2
         call parse_args(arg_values)
 
         verbose = arg_values%verbose
+        
+        ! hard code config
+        !emb_dim = 2048
+        !hidden_dim = 5632
+        !n_layers = 22
+        !n_heads = 32
+        !n_kv_heads = 4
+        !vocab_size = -32000
+        !seq_len = 2048
 
         ! open the model file 
         open(UNIT=5, FILE=arg_values%model_file, FORM="UNFORMATTED",&
                 &ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
                 ! config
-                read(5) emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
-                
+                !read(5) emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
+                read(5) dummy
+
                 head_size = emb_dim / n_heads
                 kv_head_size = n_kv_heads * head_size
                 
@@ -234,12 +261,13 @@ program llama2
 
                 end if 
 
-                if (vocab_size > 0) then 
-                        shared_weights = .true.
-                else
-                        shared_weights = .false.
-                        vocab_size = -vocab_size
-                end if 
+                shared_weights = .false.
+                !if (vocab_size > 0) then 
+                !        shared_weights = .true.
+                !else
+                !        shared_weights = .false.
+                !        vocab_size = -vocab_size
+                !end if 
 
                 ! once we know the config sizes, allocate the arrays
                 ! allocate temp, read in, convert to half precision
@@ -265,48 +293,91 @@ program llama2
                 end if
 
 
-                allocate(weights%wq(emb_dim,emb_dim,n_layers))
+                !!!!!!!!!
+                ! separate qkv
+                !!!!!!!!!
+                !allocate(weights%wq(emb_dim,emb_dim,n_layers))
+                !!allocate(temp2(emb_dim,emb_dim))
+                !do l = 1,n_layers
+                !!allocate(temp2(emb_dim,emb_dim,n_layers))
+                !read(5) weights%wq(:,:,l)
+                !!weights%wq(:,:,l) = v_float_to_half_c2(temp2)
+                !end do
+                !!deallocate(temp2)
+
+                !if (verbose) then
+                !        print *, "loaded wq weights:", size(weights%wq)
+                !end if
+                
+                
+
+                !allocate(weights%wk(emb_dim,kv_head_size,n_layers))
+                !!allocate(temp2(emb_dim,emb_dim))
+                !do l = 1,n_layers
+                !!allocate(temp2(emb_dim,emb_dim,n_layers))
+                !read(5) weights%wk(:,:,l)
+                !!weights%wk(:,:,l) = v_float_to_half_c2(temp2)
+                !end do
+                !!deallocate(temp2)
+
+
+                !if (verbose) then
+                !        print *, "loaded wk weights:", size(weights%wk)
+                !end if
+                
+                !allocate(weights%wv(emb_dim,kv_head_size,n_layers))
+                !!allocate(temp2(emb_dim,emb_dim))
+                !do l = 1,n_layers
+                !!allocate(temp2(emb_dim,emb_dim,n_layers))
+                !read(5) weights%wv(:,:,l)
+                !!weights%wv(:,:,l) = v_float_to_half_c2(temp2)
+                !end do
+                !!deallocate(temp2)
+
+                !!!!!!!!!
+                ! single qkv
+                !!!!!!!!!
+                allocate(weights%wqkv(emb_dim,emb_dim+2*kv_head_size,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) weights%wq(:,:,l)
+                read(5) weights%wqkv(:,1:emb_dim,l)
                 !weights%wq(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
                 if (verbose) then
-                        print *, "loaded wq weights:", size(weights%wq)
+                        print *, "loaded wq weights:", size(weights%wqkv(:,1:emb_dim,:))
                 end if
-                
-                
 
-                allocate(weights%wk(emb_dim,kv_head_size,n_layers))
+
+
+                !allocate(weights%wk(emb_dim,kv_head_size,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) weights%wk(:,:,l)
+                read(5) weights%wqkv(:,(emb_dim+1):(emb_dim+kv_head_size),l)
                 !weights%wk(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
 
                 if (verbose) then
-                        print *, "loaded wk weights:", size(weights%wk)
+                        print *, "loaded wk weights:", size(weights%wqkv(:,(emb_dim+1):(emb_dim+kv_head_size),:))
                 end if
-                
-                allocate(weights%wv(emb_dim,kv_head_size,n_layers))
+
+                !allocate(weights%wv(emb_dim,kv_head_size,n_layers))
                 !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
                 !allocate(temp2(emb_dim,emb_dim,n_layers))
-                read(5) weights%wv(:,:,l)
+                read(5) weights%wqkv(:,(emb_dim+kv_head_size+1):,l)
                 !weights%wv(:,:,l) = v_float_to_half_c2(temp2)
                 end do
                 !deallocate(temp2)
 
-        
 
                 if (verbose) then
-                        print *, "loaded wv weights:", size(weights%wv)
+                        print *, "loaded wv weights:", size(weights%wqkv(:,(emb_dim+kv_head_size+1):,l))
                 end if
                 
                 allocate(weights%wo(emb_dim,emb_dim,n_layers))
@@ -537,13 +608,13 @@ contains
         function p_mlp(xb,row,l, w) result(hb)
                 real(kind=wp) :: xb(:)
                 type(TransformerWeights), intent(in) :: w
-                real(kind=wp) :: temp(size(xb))        
+                !real(kind=wp) :: temp(size(xb))        
                 integer :: row, l
                 real(kind=wp) :: hb, hb2
-                temp = v_half_to_float_lookup(w%w1(:,row,l))
-                hb = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%w3(:,row,l))
-                hb2 = dot_product(xb,temp)
+                !temp = v_half_to_float_lookup(w%w1(:,row,l))
+                hb = dot_product(xb,w%w1(:,row,l))
+                !temp = v_half_to_float_lookup(w%w3(:,row,l))
+                hb2 = dot_product(xb,w%w3(:,row,l))
 
                 hb = hb*(1/(1+exp(-hb)))
 
@@ -551,21 +622,21 @@ contains
         end function
        
         ! group up front projection matmuls
-        function p_proj(xb,row,l,w) result(p)
-                real(kind=wp) :: xb(:)
-                type(TransformerWeights), intent(in) :: w
-                real(kind=wp) :: temp(size(xb))
-                integer :: row, l
-                real(kind=wp) :: p(3)
+!        function p_proj(xb,row,l,w) result(p)
+!                real(kind=wp) :: xb(:)
+!                type(TransformerWeights), intent(in) :: w
+!                real(kind=wp) :: temp(size(xb))
+!                integer :: row, l
+!                real(kind=wp) :: p(3)
+!
+!                temp = v_half_to_float_lookup(w%wq(:,row,l))
+!                p(1) = dot_product(xb,temp)
+!                temp = v_half_to_float_lookup(w%wk(:,row,l))
+!                p(2) = dot_product(xb,temp)
+!                temp = v_half_to_float_lookup(w%wv(:,row,l))
+!                p(3) = dot_product(xb,temp)
 
-                temp = v_half_to_float_lookup(w%wq(:,row,l))
-                p(1) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wk(:,row,l))
-                p(2) = dot_product(xb,temp)
-                temp = v_half_to_float_lookup(w%wv(:,row,l))
-                p(3) = dot_product(xb,temp)
-
-        end function
+!        end function
 
         function vm_matmul(a,b) result(c)
                 real(kind=wp) :: a(:)
@@ -759,9 +830,11 @@ contains
 
                 ! embeddings
                 real(kind=wp) :: proj(3)
-                real(kind=wp) :: q(emb_dim)
-                real(kind=wp) :: k(kv_head_size)
-                real(kind=wp) :: v(kv_head_size)
+                real(kind=wp), target :: qkv(emb_dim+2*kv_head_size)
+                real(kind=wp), pointer :: q(:), k(:), v(:)
+                !real(kind=wp) :: q(emb_dim)
+                !real(kind=wp) :: k(kv_head_size)
+                !real(kind=wp) :: v(kv_head_size)
       
                 ! position encoding  
                 real(kind=wp) :: q0, q1, k0, k1, fcr, fci, v0, v1, freq, rval
@@ -789,30 +862,48 @@ contains
                 logits(:) = 0
 
                 ! convert precision        
-                x = v_half_to_float_lookup(w%token_embedding_table(:,token))
+                x = w%token_embedding_table(:,token)
 
-                freq_cis_real_row = w%freq_cis_real(:,pos)
-                freq_cis_imag_row = w%freq_cis_imag(:,pos)
+                !freq_cis_real_row = w%freq_cis_real(:,pos)
+                !freq_cis_imag_row = w%freq_cis_imag(:,pos)
 
                 do l = 1,p%n_layers
                         
                         ! embed and project
                         time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
-                        !!$OMP PARALLEL DO PRIVATE(ix)
-                        do ix = 1,p%emb_dim
-                        !temp = v_half_to_float_lookup(w%wq(:,row,l))
-                        q(ix) = dot_product(xb,v_half_to_float_lookup(w%wq(:,ix,l)))
-                        end do
+                        !!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! With dot products 
+                        !!!!!!!!!!!!!!!!!!!!!!!!!
+                        !!!$OMP PARALLEL DO PRIVATE(ix)
+                        !do ix = 1,p%emb_dim
+                        !!!temp = v_half_to_float_lookup(w%wq(:,row,l))
+                        !q(ix) = dot_product(xb,(w%wq(:,ix,l)))
+                        !end do
+                        !!!$OMP END PARALLEL DO
+                        !!$OMP PARALLEL DO PRIVATE(ix,proj)
+                        !do ix = 1,p%kv_head_size
+                        !!proj = p_proj(xb,ix,l,w)
+                        !!q(ix) = proj(1)
+                        !k(ix) = dot_product(xb,(w%wk(:,ix,l)))
+                        !v(ix) = dot_product(xb,(w%wv(:,ix,l)))
+                        !end do
                         !!$OMP END PARALLEL DO
-                        !$OMP PARALLEL DO PRIVATE(ix,proj)
-                        do ix = 1,p%kv_head_size
-                        !proj = p_proj(xb,ix,l,w)
-                        !q(ix) = proj(1)
-                        k(ix) = dot_product(xb,v_half_to_float_lookup(w%wk(:,ix,l)))
-                        v(ix) = dot_product(xb,v_half_to_float_lookup(w%wv(:,ix,l)))
+                        do ix = 1,size(qkv)
+                        qkv(ix) = dot_product(xb,(w%wqkv(:,ix,l)))
                         end do
-                        !$OMP END PARALLEL DO
+                        !!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! With matmul
+                        !!!!!!!!!!!!!!!!!!!!!!!!!
+                        !qkv = matmul(xb,w%wqkv(:,:,l))
+                        q => qkv(1:emb_dim)
+                        k => qkv((emb_dim+1):(emb_dim+kv_head_size))
+                        v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
+                        !q = matmul(xb,(w%wq(:,:,l)))
+                        !k = matmul(xb,(w%wk(:,:,l)))
+                        !v = matmul(xb,(w%wv(:,:,l)))
+                        
+                        
                         s%times(1) = s%times(1) + (time_ms()-time)
                         ! position encoding
         
@@ -884,7 +975,7 @@ contains
                         ! parallel convert + matmul seems to help
                         !$OMP PARALLEL DO PRIVATE(ix,temp)
                         do ix=1,p%emb_dim
-                        temp = v_half_to_float_lookup(w%wo(:,ix,l))
+                        temp = (w%wo(:,ix,l))
                         x(ix) = x(ix) + dot_product(xb,temp)
                         !xb(ix) = x(ix)*w%rms_ffn_weight(ix,l)
                         end do
@@ -897,15 +988,21 @@ contains
           
                         !$OMP PARALLEL DO PRIVATE(ix)
                         do ix = 1,p%hidden_dim
-                        hb(ix) = p_mlp(xb,ix,l,w) 
+                        !hb(ix) = p_mlp(xb,ix,l,w) 
+                        hb(ix) = dot_product(xb,w%w1(:,ix,l))
+                        hb2(ix) = dot_product(xb,w%w3(:,ix,l))
+                        !hb(ix) = hb(ix)*(1/(1+exp(-hb(ix))))
+                        !hb(ix) = hb(ix)*hb2(ix)
                         end do
                         !$OMP END PARALLEL DO
-                        
+                        hb = hb*(1/(1+exp(-hb)))
+                        hb = hb*hb2
+
                         ! try convert + matmul here
                         !$OMP PARALLEL DO PRIVATE(ix, temp2)
                         do ix = 1,p%emb_dim
-                        temp2 = v_half_to_float_lookup(w%w2(:,ix,l))
-                        x(ix) = x(ix) + dot_product(hb,temp2)
+                        !temp2 = (w%w2(:,ix,l))
+                        x(ix) = x(ix) + dot_product(hb,w%w2(:,ix,l))
                         end do
                         !$OMP END PARALLEL DO
                         !xb = vm_matmul(hb,v_half_to_float_lookup2(w%w2(:,:,l)))
@@ -921,12 +1018,12 @@ contains
       
       
                 if (shared_weights) then
-                        logits = vm_matmul(x,v_half_to_float_lookup2(w%token_embedding_table))
+                        logits = vm_matmul(x,(w%token_embedding_table))
                 else
                         !$OMP PARALLEL DO PRIVATE (ix, temp)
                         do ix = 1,p%vocab_size
-                                temp = v_half_to_float_lookup(w%wcls(:,ix))
-                                logits(ix) = dot_product(x,temp)
+                                !temp = (w%wcls(:,ix))
+                                logits(ix) = dot_product(x,w%wcls(:,ix))
                         end do
                         !$OMP END PARALLEL DO
                         !logits = vm_matmul(x,v_half_to_float_lookup2(w%wcls))
