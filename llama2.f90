@@ -1,47 +1,5 @@
 ! llama2.f90
 
-! set precision of reals (here default which is 4 byte)
-module precision_module
-  implicit none
-  integer, parameter :: wp = kind(1.0)
-end module precision_module
-
-! structs for reading weights, config information and state 
-module weight_module
-        use precision_module
-        implicit none
-        private wp
-
-        type TransformerWeights
-                real(kind=wp), allocatable :: token_embedding_table(:,:)
-                real(kind=wp), allocatable :: rms_att_weight(:,:)
-                real(kind=wp), allocatable :: rms_ffn_weight(:,:)
-                real(kind=wp), allocatable :: wqkv(:,:,:)
-                real(kind=wp), allocatable :: wo(:,:,:)
-                real(kind=wp), allocatable :: w13(:,:,:)
-                real(kind=wp), allocatable :: w2(:,:,:)
-                real(kind=wp), allocatable :: rms_final_weight(:)
-                real(kind=wp), allocatable :: freq_cis_real(:,:)
-                real(kind=wp), allocatable :: freq_cis_imag(:,:)
-                real(kind=wp), allocatable :: wcls(:,:)
-
-        end type TransformerWeights
-
-        type Config
-                integer :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
-                integer :: kv_head_size
-        end type Config
-
-        type RunState
-
-                real(kind=wp), allocatable :: att(:,:)
-                real(kind=wp), allocatable :: key_cache(:,:,:)
-                real(kind=wp), allocatable :: value_cache(:,:,:)
-                real(kind=wp) :: times(5)
-
-        end type RunState
-
-end module weight_module
 
 module arg_parse
         implicit none
@@ -127,6 +85,7 @@ program llama2
         use precision_module
         use weight_module
         use arg_parse
+        use read_ggml, only: load_weights
         !use omp_lib
 
         implicit none
@@ -182,8 +141,26 @@ program llama2
 
         verbose = arg_values%verbose
         
+        call load_weights(arg_values%model_file, weights, conf, verbose)
+        head_size = emb_dim / n_heads
+        kv_head_size = n_kv_heads * head_size
+        shared_weights =.false.
+
+        if (verbose) then
+                        print *, "Embedding dimension: ", emb_dim
+                        print *, "Hidden dimension: ", hidden_dim
+                        print *, "Layers: ", n_layers
+                        print *, "Heads: ", n_heads
+                        print *, "kv Heads: ", n_kv_heads
+                        print *, "Vocabulary Size: ", vocab_size
+                        print *, "Sequence Length: ", seq_len
+                        print *, "Head Size: ", head_size
+                        print *, "kv Head Size: ", kv_head_size
+
+                end if
 
         ! open the model file 
+        if (.false.) then
         open(UNIT=5, FILE=arg_values%model_file, FORM="UNFORMATTED",&
                 &ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
                 ! config
@@ -393,6 +370,8 @@ program llama2
                 end if
 
         close(5) 
+
+        end if
 
         if (verbose) then
                 print *, "Loaded weights"
