@@ -161,15 +161,16 @@ contains
                         tensors(i) = read_tensor_info(5)
                 end do
 
-                if (verbose) then
-                        do i = 1, tensor_count
-                                write (*, fmt="(A20,I2)",advance="no") tensors(i)%tname, tensors(i)%ndim
-                                do j=1,tensors(i)%ndim
-                                write (*, fmt="(I6)", advance="no") tensors(i)%dims(j) 
-                                end do        
-                                write (*, fmt="(I2,I11)") tensors(i)%ttype, tensors(i)%offset 
-                        end do
-                end if
+                ! "level 2 verbose"
+                !if (verbose) then
+                !        do i = 1, tensor_count
+                !                write (*, fmt="(A20,I2)",advance="no") tensors(i)%tname, tensors(i)%ndim
+                !                do j=1,tensors(i)%ndim
+                !                write (*, fmt="(I6)", advance="no") tensors(i)%dims(j) 
+                !                end do        
+                !                write (*, fmt="(I2,I11)") tensors(i)%ttype, tensors(i)%offset 
+                !        end do
+                !end if
                 
                 inquire(unit=5,pos=file_pos)
 
@@ -200,8 +201,21 @@ contains
                 !open(unit=8, file=outfile, form='unformatted', status='unknown', ACCESS="STREAM", action="write")
                 ! write the header:
                 if (verbose) then 
-                        print *, "Header:"
-                        print *, emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
+                        if (verbose) then
+                        print *, "Embedding dimension: ", emb_length
+                        print *, "Hidden dimension: ", ffn_length
+                        print *, "Layers: ", num_layers
+                        print *, "Heads: ", head_count
+                        print *, "kv Heads: ", kv_heads
+                        print *, "Vocabulary Size: ", vocab_size
+                        print *, "Sequence Length: ", context_length
+                        print *, "Head Size: ", emb_length / head_count
+                        print *, "kv Head Size: ", emb_length / head_count * kv_heads
+
+                end if
+
+                        !print *, "Header:"
+                        !print *, emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
                 end if 
                 !write(8) emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
                 c%emb_dim = emb_length
@@ -227,10 +241,10 @@ contains
                 if (verbose) then
                         print *, "loaded embedding weights:", size(w%token_embedding_table)
                 end if
-                print *, temp_gt%ttype
-                print *, temp_gt%ndims
-                print *, w%token_embedding_table(1:10,1)
-                print *, "embed sum: ", sum(w%token_embedding_table(1:10,1:10))
+                !print *, temp_gt%ttype
+                !print *, temp_gt%ndims
+                !print *, w%token_embedding_table(1:10,1)
+                !print *, "embed sum: ", sum(w%token_embedding_table(1:10,1:10))
 
                 allocate(w%rms_att_weight(emb_length,num_layers))
                 do i = 1,num_layers
@@ -244,7 +258,6 @@ contains
                 if (verbose) then
                         print *, "loaded rms att weights:", size(w%rms_att_weight)
                 end if
-                !print *, "norm 26: ", (temp_gt%f321d(1))
 
                 allocate(w%wqkv(emb_length,emb_length+2*kv_head_size,num_layers))
                 do i = 1,num_layers
@@ -270,6 +283,11 @@ contains
                         w%wqkv(:,(emb_length+1):(emb_length+kv_head_size),i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded wk weights:", size(w%wqkv(:,(emb_length+1):(emb_length+kv_head_size),:))
+                end if
+
+
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_v.weight"
                         t0 = tensor_by_name(tempstr)
@@ -279,7 +297,11 @@ contains
                         w%wqkv(:,(emb_length+kv_head_size+1):(emb_length+2*kv_head_size),i) = temp_gt%f322d
                 end do
 
-                print *, "qkv sum: ", sum(w%wqkv)
+                !print *, "qkv sum: ", sum(w%wqkv)
+                if (verbose) then
+                        print *, "loaded wv weights:", size(w%wqkv(:,(emb_length+kv_head_size+1):,:))
+                end if
+
 
 
                 allocate(w%wo(emb_length,emb_length,num_layers))
@@ -292,6 +314,11 @@ contains
                         w%wo(:,:,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded wo weights:", size(w%wo)
+                end if
+
+
                 allocate(w%rms_ffn_weight(emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_norm.weight"
@@ -301,6 +328,11 @@ contains
                         !call write_tensor(8,temp_gt)
                         w%rms_ffn_weight(:,i) = temp_gt%f321d
                 end do
+
+                if (verbose) then
+                        print *, "loaded ffn norm weights:", size(w%rms_ffn_weight)
+                end if
+
 
                 allocate(w%w13(emb_length,2*ffn_length,num_layers))
                 do i = 1,num_layers
@@ -312,6 +344,11 @@ contains
                         w%w13(:,1:ffn_length,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded w1 (gate) weights:", size(w%w13(:,1:ffn_length,:))
+                end if
+
+
                 allocate(w%w2(ffn_length,emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_down.weight"
@@ -322,6 +359,11 @@ contains
                         w%w2(:,:,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded w2 (down) weights:", size(w%w2)
+                end if
+
+
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_up.weight"
                         t0 = tensor_by_name(tempstr)
@@ -331,11 +373,21 @@ contains
                         w%w13(:,(ffn_length+1):,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded w3 (up) weights:", size(w%w13(:,(ffn_length+1):,:))
+                end if
+
+
                 t0 = tensor_by_name("output_norm.weight")
                 temp_gt = read_layer(5,t0,file_pos)
                 ! f32
                 !call write_tensor(8,temp_gt)
                 w%rms_final_weight = temp_gt%f321d
+
+                if (verbose) then
+                        print *, "loaded output norm weights:", size(w%rms_final_weight)
+                end if
+
 
                 !temp2f32 = get_rope_freqs(emb_length/head_count,context_length,10000.0)
                 !if (verbose) then
@@ -353,6 +405,11 @@ contains
                 ! f16
                 !call write_tensor(8,temp_gt)
                 w%wcls = temp_gt%f322d
+
+                if (verbose) then
+                        print *, "loaded classifier weights:", size(w%wcls)
+                end if
+
 
         !close(8)
         !end if ! writing outfile 
@@ -543,9 +600,9 @@ contains
                 type(generic_tensor) :: d
                 integer :: file_pos
                 !integer(2), allocatable :: d(:)
-                if (verbose) then
-                        write(*,"(A,A26)",advance="no") "reading",layer%tname
-                end if
+                !if (verbose) then
+                !        write(*,"(A,A26)",advance="no") "reading",layer%tname
+                !end if
                 call fseek(handle,layer%offset+file_pos-1,0)
                 d%ttype = layer%ttype
                 d%ndims = layer%ndim
@@ -574,9 +631,9 @@ contains
                         print *, "Type not supported", layer%ttype
                 end if
                 
-                if (verbose) then
-                        write(*,"(A)") "... done"
-                end if
+                !if (verbose) then
+                !        write(*,"(A)") "... done"
+                !end if
 
         end function   
         

@@ -19,8 +19,8 @@ module weight_module
                 real(kind=wp), allocatable :: w13(:,:,:)
                 real(kind=wp), allocatable :: w2(:,:,:)
                 real(kind=wp), allocatable :: rms_final_weight(:)
-                real(kind=wp), allocatable :: freq_cis_real(:,:)
-                real(kind=wp), allocatable :: freq_cis_imag(:,:)
+                !real(kind=wp), allocatable :: freq_cis_real(:,:)
+                !real(kind=wp), allocatable :: freq_cis_imag(:,:)
                 real(kind=wp), allocatable :: wcls(:,:)
 
         end type TransformerWeights

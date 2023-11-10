@@ -111,7 +111,7 @@ program llama2
         type(TransformerWeights) :: weights
         logical :: shared_weights
         integer :: head_size, kv_head_size, tmp
-        type(config) :: conf
+        type(config) :: conf, dummy_conf
         type(RunState) :: s
         real(kind=wp), allocatable :: logits(:)
         real(kind=wp), allocatable :: freq_buf(:)
@@ -148,24 +148,24 @@ program llama2
         
         if (.not. arg_values%ak) then
 
-        call load_ggml(arg_values%model_file, weights, conf, vocab, scores, vocab_len, verbose)
+        call load_ggml(arg_values%model_file, weights, dummy_conf, vocab, scores, vocab_len, verbose)
         max_len = maxval(vocab_len)-2
         head_size = emb_dim / n_heads
         kv_head_size = n_kv_heads * head_size
         shared_weights =.false.
 
-        if (verbose) then
-                        print *, "Embedding dimension: ", emb_dim
-                        print *, "Hidden dimension: ", hidden_dim
-                        print *, "Layers: ", n_layers
-                        print *, "Heads: ", n_heads
-                        print *, "kv Heads: ", n_kv_heads
-                        print *, "Vocabulary Size: ", vocab_size
-                        print *, "Sequence Length: ", seq_len
-                        print *, "Head Size: ", head_size
-                        print *, "kv Head Size: ", kv_head_size
-
-                end if
+        !if (verbose) then
+        !                print *, "Embedding dimension: ", emb_dim
+        !                print *, "Hidden dimension: ", hidden_dim
+        !                print *, "Layers: ", n_layers
+        !                print *, "Heads: ", n_heads
+        !                print *, "kv Heads: ", n_kv_heads
+        !                print *, "Vocabulary Size: ", vocab_size
+        !                print *, "Sequence Length: ", seq_len
+        !                print *, "Head Size: ", head_size
+        !                print *, "kv Head Size: ", kv_head_size
+        !
+        !        end if
 
         ! open the model file 
         else
@@ -343,25 +343,25 @@ program llama2
 
                 !head_size = emb_dim / n_heads
 
-                allocate(weights%freq_cis_real(head_size/2,seq_len))
+                !allocate(weights%freq_cis_real(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
-                read(5) weights%freq_cis_real
+                !read(5) weights%freq_cis_real
                 !weights%freq_cis_real = v_float_to_half_c2(temp2)
                 ! deallocate(temp2)
 
-                if (verbose) then
-                        print *, "loaded freq cis real  weights:", size(weights%freq_cis_real)
-                end if
+                !if (verbose) then
+                !        print *, "loaded freq cis real  weights:", size(weights%freq_cis_real)
+                !end if
                 
-                allocate(weights%freq_cis_imag(head_size/2,seq_len))
+                !allocate(weights%freq_cis_imag(head_size/2,seq_len))
                 !allocate(temp2(head_size/2,seq_len))
-                read(5) weights%freq_cis_imag
+                !read(5) weights%freq_cis_imag
                 !weights%freq_cis_imag = v_float_to_half_c2(temp2)
                 !deallocate(temp2)
 
-                if (verbose) then
-                        print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
-                end if
+                !if (verbose) then
+                !        print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
+                !end if
 
 
                 if (.not. shared_weights) then
@@ -465,7 +465,7 @@ program llama2
         
         ! autoregressive model. get the next token from the last
         do pos = 1,seq_len
-                logits = transformer(token,pos,conf,s,weights)
+                logits = transformer(token,pos,s,weights)
               
                 if (pos <= size(prompt_tokens)) then
 
@@ -566,22 +566,22 @@ contains
 
         end function 
 
-        function transformer(token, pos, p, s, w) result(logits)
+        function transformer(token, pos, s, w) result(logits)
                 integer, intent(in) :: token, pos
-                type(Config), intent(in) :: p
+                !type(Config), intent(in) :: p
                 type(Runstate) :: s
                 type(TransformerWeights), intent(in) :: w
-                real(kind=wp) :: logits(p%vocab_size)
+                real(kind=wp) :: logits(vocab_size)
 
-                real(kind=wp) :: x(p%emb_dim)
-                real(kind=wp) :: xb(p%emb_dim)
-                real(kind=wp) :: temp(p%emb_dim)
-                real(kind=wp) :: temp2(p%hidden_dim)
-                real(kind=wp) :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
-                real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
+                real(kind=wp) :: x(emb_dim)
+                real(kind=wp) :: xb(emb_dim)
+                real(kind=wp) :: temp(emb_dim)
+                real(kind=wp) :: temp2(hidden_dim)
+                !real(kind=wp) :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
+                !real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
                 ! embeddings
-                real(kind=wp), target :: qkv(p%emb_dim+2*p%kv_head_size)
+                real(kind=wp), target :: qkv(emb_dim+2*kv_head_size)
                 real(kind=wp), pointer :: q(:), k(:), v(:)
                 !real(kind=wp) :: q(emb_dim)
                 !real(kind=wp) :: k(kv_head_size)
@@ -592,17 +592,17 @@ contains
                 integer :: head_dim
 
                 ! attention
-                real(kind=wp) :: q_t(p%emb_dim/p%n_heads)
-                real(kind=wp) :: k_t(p%emb_dim/p%n_heads)
-                real(kind=wp) :: v_t(p%emb_dim/p%n_heads)
-                real(kind=wp) :: xbh(p%emb_dim/p%n_heads)
+                real(kind=wp) :: q_t(emb_dim/n_heads)
+                real(kind=wp) :: k_t(emb_dim/n_heads)
+                real(kind=wp) :: v_t(emb_dim/n_heads)
+                real(kind=wp) :: xbh(emb_dim/n_heads)
                 real(kind=wp) :: a
                 integer :: kv_mul
 
                 ! fc layers
                 !real(kind=wp) :: hb(hidden_dim)
                 !real(kind=wp) :: hb2(hidden_dim)
-                real(kind=wp), target :: hb13(2*p%hidden_dim)
+                real(kind=wp), target :: hb13(2*hidden_dim)
                 real(kind=wp), pointer :: hb(:), hb2(:) 
 
                 ! counters etc
@@ -610,7 +610,7 @@ contains
                 real(kind=wp) :: time
 
 
-                head_size = p%emb_dim/p%n_heads
+                head_size = emb_dim/n_heads
 
                 logits(:) = 0
 
@@ -618,7 +618,7 @@ contains
                 x = w%token_embedding_table(:,token)
 
 
-                do l = 1,p%n_layers
+                do l = 1,n_layers
                         
                         ! embed and project
                         time = time_ms()
@@ -638,7 +638,7 @@ contains
         
                         time = time_ms()
                         ! check that this doens't add any time
-                        do i=1,p%emb_dim,2
+                        do i=1,emb_dim,2
                                 head_dim = mod(i,head_size)
                                 freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / head_size))
                                 rval = pos * freq
@@ -667,9 +667,9 @@ contains
                         ! multi head attention and fc layers
                         time = time_ms()
                         
-                        kv_mul = p%n_heads / p%n_kv_heads
+                        kv_mul = n_heads / n_kv_heads
                         
-                        do h = 0,(p%n_heads-1)        
+                        do h = 0,(n_heads-1)        
 
                         q_t = q((h*head_size+1):((h+1)*head_size))
           
@@ -698,7 +698,7 @@ contains
 
                         time = time_ms()
                         
-                        do ix=1,p%emb_dim
+                        do ix=1,emb_dim
                         x(ix) = x(ix) + dot_product(xb,w%wo(:,ix,l))
                         end do
                         
@@ -713,7 +713,7 @@ contains
                         hb = hb*(1/(1+exp(-hb)))
                         hb = hb*hb2
 
-                        do ix = 1,p%emb_dim
+                        do ix = 1,emb_dim
                         x(ix) = x(ix) + dot_product(hb,w%w2(:,ix,l))
                         end do
 
@@ -729,7 +729,7 @@ contains
                 !if (shared_weights) then
                 !        logits = vm_matmul(x,(w%token_embedding_table))
                 !else
-                        do ix = 1,p%vocab_size
+                        do ix = 1,vocab_size
                                 logits(ix) = dot_product(x,w%wcls(:,ix))
                         end do
                 !end if
