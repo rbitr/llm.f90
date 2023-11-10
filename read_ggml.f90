@@ -49,11 +49,16 @@ module read_ggml
         !integer :: file_pos
         integer(8) :: tensor_count
 contains
-        subroutine load_weights(filename, w, c, v)
+        subroutine load_ggml(filename, w, c, vocab, scores, token_lengths, v)
         character(len=*), intent(in) :: filename
         type(TransformerWeights), intent(out) :: w
         type(Config), intent(out) :: c
+        real(kind=wp), allocatable, intent(out) :: scores(:)
+        character(:), dimension(:), allocatable, intent(out) :: vocab
+        integer(4), allocatable, intent(out) :: token_lengths(:)
         logical, intent(in) :: v
+        
+        character(:), dimension(:), allocatable :: vocab_swp
         integer(4) :: magic, version
         integer(8) :: kv_pairs
         !class(*), allocatable :: demo
@@ -79,9 +84,9 @@ contains
         !type (args) :: arg_values
 
 
-        real(kind=wp), allocatable :: scores(:)
-        character(:), dimension(:), allocatable :: vocab
-        integer(4), allocatable :: token_lengths(:)
+        !real(kind=wp), allocatable :: scores(:)
+        !character(:), dimension(:), allocatable :: vocab
+        !integer(4), allocatable :: token_lengths(:)
         integer(8) :: tmp_vocab_size
         integer(4) :: temp_int, maxlen
 
@@ -352,7 +357,7 @@ contains
         !close(8)
         !end if ! writing outfile 
 
-        if (.false.) then
+        if (.true.) then
                 ! just read and write the values again:
                 call fseek(5,0,0) 
                 read(5) magic, version, tensor_count, kv_pairs
@@ -406,13 +411,15 @@ contains
                         end if
                 end do
 
-                open(unit=8, file="", form='unformatted', status='unknown', ACCESS="STREAM", action="write")
+                !open(unit=8, file="", form='unformatted', status='unknown', ACCESS="STREAM", action="write")
                 maxlen = maxval(token_lengths)
+                
+                allocate(character(len=max_len) ::  vocab_swp(tmp_vocab_size))
                 if (verbose) then
                 print *, "maximum token length ", maxlen
                 end if
                 !temp_int = 10
-                write(8) maxlen 
+                !write(8) maxlen 
                 do i=1,size(vocab)
                 read(vocab(i)(1:1), "(A)") tbytes(1)
                 read(vocab(i)(2:2), "(A)") tbytes(2)
@@ -425,19 +432,22 @@ contains
                 allocate(character(token_lengths(i)-2) :: loaded_str)
                 loaded_str(1:1) = " "
                 loaded_str(2:) = vocab(i)(4:token_lengths(i))
-                write(8) scores(i),token_lengths(i)-2,loaded_str
+                !write(8) scores(i),token_lengths(i)-2,loaded_str
+                token_lengths(i) = token_lengths(i)-2
+                vocab_swp(i) = loaded_str
                 deallocate(loaded_str)
                 else
-                write(8) scores(i),token_lengths(i),vocab(i)(1:token_lengths(i))
+                !write(8) scores(i),token_lengths(i),vocab(i)(1:token_lengths(i))
+                vocab_swp(i) = vocab(i)(1:token_lengths(i))
         end if
                 end do
 
         end if
 
-        close(8)
+        !close(8)
 
         close(5)
-
+        vocab = vocab_swp
         end subroutine
 
         

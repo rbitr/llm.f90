@@ -9,7 +9,7 @@ module arg_parse
                 character(:), allocatable :: model_file
                 character(:), allocatable :: prompt
                 character(:), allocatable :: tokenizer
-                logical :: verbose
+                logical :: verbose, ak
                 integer :: n
         end type args
 
@@ -28,7 +28,8 @@ module arg_parse
                         arg_values%prompt = ""
                         arg_values%verbose = .false.
                         arg_values%n = 256
-                        arg_values%tokenizer = "tokenizer.bin"
+                        arg_values%tokenizer = ""
+                        arg_values%ak = .false.
                 
                         num_args = command_argument_count()
 
@@ -65,6 +66,10 @@ module arg_parse
                                                 ! print additional information
                                                 arg_values%verbose = .true.
                                                 i = i + 1
+                                                case ('--ak')
+                                                ! llama2.c file format
+                                                arg_values%ak = .true.
+                                                i = i + 1
                                                 case default
                                                 print *, 'Unrecognized option:', trim(arg)
                                                 stop
@@ -85,7 +90,7 @@ program llama2
         use precision_module
         use weight_module
         use arg_parse
-        use read_ggml, only: load_weights
+        use read_ggml, only: load_ggml
         !use omp_lib
 
         implicit none
@@ -141,7 +146,10 @@ program llama2
 
         verbose = arg_values%verbose
         
-        call load_weights(arg_values%model_file, weights, conf, verbose)
+        if (.not. arg_values%ak) then
+
+        call load_ggml(arg_values%model_file, weights, conf, vocab, scores, vocab_len, verbose)
+        max_len = maxval(vocab_len)-2
         head_size = emb_dim / n_heads
         kv_head_size = n_kv_heads * head_size
         shared_weights =.false.
@@ -160,7 +168,7 @@ program llama2
                 end if
 
         ! open the model file 
-        if (.false.) then
+        else
         open(UNIT=5, FILE=arg_values%model_file, FORM="UNFORMATTED",&
                 &ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
                 ! config
@@ -398,6 +406,7 @@ program llama2
         s%value_cache(:,:,:) = 0
         s%times = 0
 
+        if (arg_values%tokenizer /= "") then
         ! read in token vocab
         open(UNIT=5, FILE=arg_values%tokenizer, FORM="UNFORMATTED",&
                & ACCESS="STREAM", STATUS="OLD", POSITION="REWIND", ACTION="READ")
@@ -405,6 +414,11 @@ program llama2
                 read(5) max_len
 
                 ! in fortran, all strings have to be the same length
+                if (allocated(vocab)) then
+                        deallocate(vocab)
+                        deallocate(scores)
+                        deallocate(vocab_len)
+                end if
                 allocate(character(len=max_len) ::  vocab(vocab_size))
                 allocate(scores(vocab_size))
                 allocate(vocab_len(vocab_size))
@@ -427,6 +441,7 @@ program llama2
                 end do
 
         close(5)
+        end if
 
         ! __main__ part
 
