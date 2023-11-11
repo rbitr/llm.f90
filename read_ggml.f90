@@ -48,6 +48,7 @@ module read_ggml
         logical :: verbose
         !integer :: file_pos
         integer(8) :: tensor_count
+        logical, parameter :: verbose2 = .false.
 contains
         subroutine load_ggml(filename, w, c, vocab, scores, token_lengths, v)
         character(len=*), intent(in) :: filename
@@ -162,15 +163,15 @@ contains
                 end do
 
                 ! "level 2 verbose"
-                !if (verbose) then
-                !        do i = 1, tensor_count
-                !                write (*, fmt="(A20,I2)",advance="no") tensors(i)%tname, tensors(i)%ndim
-                !                do j=1,tensors(i)%ndim
-                !                write (*, fmt="(I6)", advance="no") tensors(i)%dims(j) 
-                !                end do        
-                !                write (*, fmt="(I2,I11)") tensors(i)%ttype, tensors(i)%offset 
-                !        end do
-                !end if
+                if (verbose2) then
+                        do i = 1, tensor_count
+                                write (*, fmt="(A20,I2)",advance="no") tensors(i)%tname, tensors(i)%ndim
+                                do j=1,tensors(i)%ndim
+                                write (*, fmt="(I6)", advance="no") tensors(i)%dims(j) 
+                                end do        
+                                write (*, fmt="(I2,I11)") tensors(i)%ttype, tensors(i)%offset 
+                        end do
+                end if
                 
                 inquire(unit=5,pos=file_pos)
 
@@ -209,8 +210,6 @@ contains
                         print *, "kv Heads: ", kv_heads
                         print *, "Vocabulary Size: ", vocab_size
                         print *, "Sequence Length: ", context_length
-                        print *, "Head Size: ", emb_length / head_count
-                        print *, "kv Head Size: ", emb_length / head_count * kv_heads
 
                 end if
 
@@ -229,8 +228,10 @@ contains
                 head_size = emb_length / head_count
                 kv_head_size = kv_heads * head_size
                 
+                if (verbose) then
                 print *, "head size ", head_size
                 print *, "kv head Size ", kv_head_size
+                end if
 
                 t0 = tensor_by_name("token_embd.weight")
                 temp_gt = read_layer(5,t0,file_pos)
@@ -427,7 +428,7 @@ contains
                 do i = 1,kv_pairs
                         tempstr = read_str(5)
                         read(5) val_type
-                        if (verbose) then
+                        if (verbose2) then
                         print *, "scanning ", tempstr
                         end if
                         if (tempstr .eq. "tokenizer.ggml.tokens") then

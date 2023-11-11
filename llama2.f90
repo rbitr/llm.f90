@@ -76,7 +76,6 @@ module arg_parse
                                                 end select
                         end do
 
-                        ! check for arguments
 
 
                 end subroutine
@@ -142,6 +141,7 @@ program llama2
         ! timing
         real(kind=wp) :: t_ms_start, t_ms_end
 
+
         call parse_args(arg_values)
 
         verbose = arg_values%verbose
@@ -154,18 +154,6 @@ program llama2
         kv_head_size = n_kv_heads * head_size
         shared_weights =.false.
 
-        !if (verbose) then
-        !                print *, "Embedding dimension: ", emb_dim
-        !                print *, "Hidden dimension: ", hidden_dim
-        !                print *, "Layers: ", n_layers
-        !                print *, "Heads: ", n_heads
-        !                print *, "kv Heads: ", n_kv_heads
-        !                print *, "Vocabulary Size: ", vocab_size
-        !                print *, "Sequence Length: ", seq_len
-        !                print *, "Head Size: ", head_size
-        !                print *, "kv Head Size: ", kv_head_size
-        !
-        !        end if
 
         ! open the model file 
         else
@@ -199,177 +187,101 @@ program llama2
                 !        vocab_size = -vocab_size
                 !end if 
 
-                ! once we know the config sizes, allocate the arrays
-                ! allocate temp, read in, convert to half precision
                 
                 allocate(weights%token_embedding_table(emb_dim,vocab_size))
-                !allocate(temp2(emb_dim,vocab_size))
                 read(5) weights%token_embedding_table
-                !weights%token_embedding_table = v_float_to_half_c2(temp2)
-                !deallocate(temp2)
                 
                 if (verbose) then
                         print *, "loaded embedding weights:", size(weights%token_embedding_table)
                 end if 
 
                 allocate(weights%rms_att_weight(emb_dim,n_layers))
-                !allocate(temp2(emb_dim,n_layers))
                 read(5) weights%rms_att_weight
-                !weights%rms_att_weight = v_float_to_half_c2(temp2)
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded rms att weights:", size(weights%rms_att_weight)
                 end if
 
-
-
                 !!!!!!!!!
                 ! single qkv
                 !!!!!!!!!
                 allocate(weights%wqkv(emb_dim,emb_dim+2*kv_head_size,n_layers))
-                !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
-                !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) weights%wqkv(:,1:emb_dim,l)
-                !weights%wq(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded wq weights:", size(weights%wqkv(:,1:emb_dim,:))
                 end if
 
-
-
-                !allocate(weights%wk(emb_dim,kv_head_size,n_layers))
-                !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
-                !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) weights%wqkv(:,(emb_dim+1):(emb_dim+kv_head_size),l)
-                !weights%wk(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
-
 
                 if (verbose) then
                         print *, "loaded wk weights:", size(weights%wqkv(:,(emb_dim+1):(emb_dim+kv_head_size),:))
                 end if
 
-                !allocate(weights%wv(emb_dim,kv_head_size,n_layers))
-                !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
-                !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) weights%wqkv(:,(emb_dim+kv_head_size+1):,l)
-                !weights%wv(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
-
 
                 if (verbose) then
                         print *, "loaded wv weights:", size(weights%wqkv(:,(emb_dim+kv_head_size+1):,l))
                 end if
                 
                 allocate(weights%wo(emb_dim,emb_dim,n_layers))
-                !allocate(temp2(emb_dim,emb_dim))
                 do l = 1,n_layers
-                !allocate(temp2(emb_dim,emb_dim,n_layers))
                 read(5) weights%wo(:,:,l)
-                !weights%wo(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
-
-
 
                 if (verbose) then
                         print *, "loaded wo weights:", size(weights%wo)
                 end if
 
                 allocate(weights%rms_ffn_weight(emb_dim,n_layers))
-                !allocate(temp2(emb_dim,n_layers))
                 read(5) weights%rms_ffn_weight
-                !weights%rms_ffn_weight = v_float_to_half_c2(temp2)
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded rms ffn  weights:", size(weights%rms_ffn_weight)
                 end if
 
                 allocate(weights%w13(emb_dim,2*hidden_dim,n_layers))
-                !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
                 read(5) weights%w13(:,1:hidden_dim,l)
-                !weights%w1(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w1 weights:", size(weights%w13(:,1:hidden_dim,:))
                 end if
 
                 allocate(weights%w2(hidden_dim,emb_dim,n_layers))
-                !allocate(temp2(hidden_dim,emb_dim))
                 do l = 1,n_layers
                 read(5) weights%w2(:,:,l)
-                !weights%w2(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w2 weights:", size(weights%w2)
                 end if
 
-                !allocate(weights%w3(emb_dim,hidden_dim,n_layers))
-                !allocate(temp2(emb_dim,hidden_dim))
                 do l = 1,n_layers
                 read(5) weights%w13(:,(hidden_dim+1):,l)
-                !weights%w3(:,:,l) = v_float_to_half_c2(temp2)
                 end do
-                !deallocate(temp2)
 
                 if (verbose) then
                         print *, "loaded w3 weights:", size(weights%w13(:,hidden_dim,:))
                 end if
 
                 allocate(weights%rms_final_weight(emb_dim))
-                !allocate(temp1(emb_dim))
                 read(5) weights%rms_final_weight
-                !weights%rms_final_weight = v_float_to_half_c(temp1)
-                !deallocate(temp1)
 
                 if (verbose) then
                         print *, "loaded rms_final weights:", size(weights%rms_final_weight)
                 end if
 
-                !head_size = emb_dim / n_heads
-
-                !allocate(weights%freq_cis_real(head_size/2,seq_len))
-                !allocate(temp2(head_size/2,seq_len))
-                !read(5) weights%freq_cis_real
-                !weights%freq_cis_real = v_float_to_half_c2(temp2)
-                ! deallocate(temp2)
-
-                !if (verbose) then
-                !        print *, "loaded freq cis real  weights:", size(weights%freq_cis_real)
-                !end if
-                
-                !allocate(weights%freq_cis_imag(head_size/2,seq_len))
-                !allocate(temp2(head_size/2,seq_len))
-                !read(5) weights%freq_cis_imag
-                !weights%freq_cis_imag = v_float_to_half_c2(temp2)
-                !deallocate(temp2)
-
-                !if (verbose) then
-                !        print *, "loaded freq_cis_imag weights:", size(weights%freq_cis_imag)
-                !end if
-
-
                 if (.not. shared_weights) then
                         allocate(weights%wcls(emb_dim,vocab_size))
-                        !allocate(temp2(emb_dim,vocab_size))
                         read(5) weights%wcls
-                        !weights%wcls = v_float_to_half_c2(temp2)
-                        !deallocate(temp2)
 
                         if (verbose) then
                                 print *, "loaded wcls weights:", size(weights%wcls)
@@ -443,7 +355,7 @@ program llama2
         close(5)
         end if
 
-        ! __main__ part
+        ! main part
 
         temperature = arg_values%temperature
         prompt = arg_values%prompt
@@ -544,16 +456,15 @@ contains
               xr = x*w/xn
         end function
 
-        function trmsnorm(x,w,xn) result(xr)
-              real(kind=wp) :: x, w
-              real(kind=wp) :: xr
-              real(kind=wp) :: xn
-              !xn = sqrt(dot_product(x,x)/size(x)+1e-5)
-
-              xr = x*w/xn
-        end function
+        !function trmsnorm(x,w,xn) result(xr)
+        !      real(kind=wp) :: x, w
+        !      real(kind=wp) :: xr
+        !      real(kind=wp) :: xn
+        !      !xn = sqrt(dot_product(x,x)/size(x)+1e-5)
+        !
+        !      xr = x*w/xn
+        !end function
       
-        ! declared as "pure" for potentiall parallelization of heads
         pure function softmax(x,s) result (p)
               real(kind=wp), intent(in) :: x(:)
               integer, intent(in) :: s
@@ -575,17 +486,10 @@ contains
 
                 real(kind=wp) :: x(emb_dim)
                 real(kind=wp) :: xb(emb_dim)
-                real(kind=wp) :: temp(emb_dim)
-                real(kind=wp) :: temp2(hidden_dim)
-                !real(kind=wp) :: freq_cis_real_row(p%emb_dim/p%n_heads/2)
-                !real(kind=wp) :: freq_cis_imag_row(p%emb_dim/p%n_heads/2)
 
                 ! embeddings
                 real(kind=wp), target :: qkv(emb_dim+2*kv_head_size)
                 real(kind=wp), pointer :: q(:), k(:), v(:)
-                !real(kind=wp) :: q(emb_dim)
-                !real(kind=wp) :: k(kv_head_size)
-                !real(kind=wp) :: v(kv_head_size)
       
                 ! position encoding  
                 real(kind=wp) :: q0, q1, k0, k1, fcr, fci, v0, v1, freq, rval
@@ -600,8 +504,6 @@ contains
                 integer :: kv_mul
 
                 ! fc layers
-                !real(kind=wp) :: hb(hidden_dim)
-                !real(kind=wp) :: hb2(hidden_dim)
                 real(kind=wp), target :: hb13(2*hidden_dim)
                 real(kind=wp), pointer :: hb(:), hb2(:) 
 
