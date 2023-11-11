@@ -14,6 +14,9 @@ read_ggml.o: read_ggml.f90
 llm: weight_module.o read_ggml.o llama2.o 
 	$(FORTRAN) -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC weight_module.o read_ggml.o llama2.o -o llm 
 
+load: load.f90
+	$(FORTRAN) -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC load.f90 -o load 
+	
 
 all: llm
 

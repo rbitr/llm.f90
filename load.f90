@@ -114,46 +114,46 @@ module arg_parse
 end module arg_parse
 
 
-module conversions
-        use iso_c_binding
-        !use quants
-        use precision_module
-        implicit none
-
-        interface
-                pure function float_to_half_c(x) bind(C, name="float_to_half")
-                        use iso_c_binding
-                        real(c_float), value :: x
-                        integer(c_int16_t) :: float_to_half_c
-                end function float_to_half_c
-
-                pure function half_to_float_c(h) bind(C, name="half_to_float")
-                        use iso_c_binding
-                        integer(c_int16_t), value :: h
-                        real(c_float) :: half_to_float_c
-                end function half_to_float_c
-
-                function pack2x4_c(xi0, xi1) bind(C, name="pack2x4")
-                        use iso_c_binding
-                        integer(c_int8_t), value :: xi0, xi1
-                        integer(c_int8_t) :: pack2x4_c
-                end function pack2x4_c
-
-                function unpack_high_c(x) bind(C, name="unpack_high")
-                        use iso_c_binding
-                        integer(c_int8_t), value :: x
-                        integer(c_int8_t) :: unpack_high_c
-                end function unpack_high_c
-
-                function unpack_low_c(x) bind(C, name="unpack_low")
-                        use iso_c_binding
-                        integer(c_int8_t), value :: x
-                        integer(c_int8_t) :: unpack_low_c
-                end function unpack_low_c
-
-        end interface
-
-end module 
+!module conversions
+!        use iso_c_binding
+!        !use quants
+!        use precision_module
+!        implicit none
+!
+!        interface
+!                pure function float_to_half_c(x) bind(C, name="float_to_half")
+!                        use iso_c_binding
+!                        real(c_float), value :: x
+!                        integer(c_int16_t) :: float_to_half_c
+!                end function float_to_half_c
+!
+!               pure function half_to_float_c(h) bind(C, name="half_to_float")
+!                        use iso_c_binding
+!                        integer(c_int16_t), value :: h
+!                        real(c_float) :: half_to_float_c
+!                end function half_to_float_c
+!
+!                function pack2x4_c(xi0, xi1) bind(C, name="pack2x4")
+!                        use iso_c_binding
+!                        integer(c_int8_t), value :: xi0, xi1
+!                        integer(c_int8_t) :: pack2x4_c
+!                end function pack2x4_c
+!
+!                function unpack_high_c(x) bind(C, name="unpack_high")
+!                        use iso_c_binding
+!                        integer(c_int8_t), value :: x
+!                        integer(c_int8_t) :: unpack_high_c
+!                end function unpack_high_c
+!
+!                function unpack_low_c(x) bind(C, name="unpack_low")
+!                        use iso_c_binding
+!                        integer(c_int8_t), value :: x
+!                        integer(c_int8_t) :: unpack_low_c
+!                end function unpack_low_c
+!
+!        end interface
+!
+!end module 
 
 program load
         use precision_module
@@ -305,7 +305,7 @@ program load
 
                 read(5) f16
                
-                print *, "First value", half_to_float_c(f16) 
+                !print *, "First value", half_to_float_c(f16) 
 
                 t0 = tensor_by_name("token_embd.weight")
                 temp_gt = read_layer(5,t0)
@@ -401,15 +401,15 @@ program load
                 ! f32
                 call write_tensor(8,temp_gt)
 
-                temp2f32 = get_rope_freqs(emb_length/head_count,context_length,10000.0)
-                if (verbose) then
-                write(*,"(A)") "rope cos: writing float32"
-                end if
-                write(8) cos(temp2f32(:,:context_length))
-                if (verbose) then
-                write(*,"(A)") "rope sin: writing float32"
-                end if
-                write(8) sin(temp2f32(:,:context_length))
+                !temp2f32 = get_rope_freqs(emb_length/head_count,context_length,10000.0)
+                !if (verbose) then
+                !write(*,"(A)") "rope cos: writing float32"
+                !end if
+                !write(8) cos(temp2f32(:,:context_length))
+                !if (verbose) then
+                !write(*,"(A)") "rope sin: writing float32"
+                !end if
+                !write(8) sin(temp2f32(:,:context_length))
                 ! cos and sin of the above are the cos/sin respectively (f32)
 
                 t0 = tensor_by_name("output.weight")
