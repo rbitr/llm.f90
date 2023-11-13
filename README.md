@@ -75,7 +75,7 @@ to find people who were interested in knitting, and on and on.
 
 ### Notes
 
-The base version currently hard codes the model parameters. This is trivially changed with some uncommenting that will let you load any llama2 model. For anything much bigger (depending on your computer) the suggested branch is [rbitr/llama2.f90/tree/version_0](rbitr/llama2.f90/tree/version_0) than implements 16-bit floats and parallelism but has not been optimized. To use this branch you will have to get a .gguf version of the model and then convert it as described in the readme.
+The base version currently hard codes the model parameters. This is trivially changed with some uncommenting that will let you load any llama2 model. For anything much bigger (depending on your computer) the suggested branch is https://github.com/rbitr/llama2.f90/tree/version_0 than implements 16-bit floats and parallelism but has not been optimized. To use this branch you will have to get a .gguf version of the model and then convert it as described in the readme.
 
 Models may load slightly faster if you convert to the "ak" file format (from Andrej Karpathy's llama2.c) and load that instead. 
 
@@ -84,8 +84,8 @@ Models may load slightly faster if you convert to the "ak" file format (from And
 If you want to use `llm.f90` for a project and need support, please get in touch. See the `motivation` section below for information about the "philosophy". We want any features added to not add complexity, so for example quantization will be written as a separate program.
 
 - :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv)
-- :construction: Parallelism: see rbitr/llama2.f90/tree/version_0 (also with 16-bit quantization)
-- :construction: Quantization: see rbitr/llama2.f90/tree/f16_convert and rbitr/llama2.f90/tree/four_bit_dev for 16-bit and 4-bit respectively
+- :construction: Parallelism: see https://github.com/rbitr/llama2.f90/tree/version_0 (also with 16-bit quantization)
+- :construction: Quantization: see https://github.com/rbitr/llama2.f90/tree/f16_convert and https://github.com/rbitr/llama2.f90/tree/four_bit_dev for 16-bit and 4-bit respectively
 - :soon: Support for other models
 - :soon: Test on other architectures machines (Apple, other ARM, etc). Please open issues for any feedback.
 - :soon: ... 
