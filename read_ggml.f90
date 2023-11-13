@@ -151,10 +151,10 @@ contains
                                 ffn_length = values(i)%i32
                         end if
                         
-                        
+                        if (verbose) then
                         print *, keys(i)
                         call print_multi(values(i))
-                        !print *, values(i)%item
+                        end if
                 end do
 
                 allocate(tensors(tensor_count))

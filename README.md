@@ -1,92 +1,73 @@
-# llama2.f90
-LLaMA2 model inference in Fortran
+# llm.f90 (formerly llama2.f90)
+Hackable largre language model inference in pure Fortran
 
-## Use
+## Getting started
 
-Supports llama2 models in gguf format (f16 only - but see the four\_bit\_dev branch)
-
-### Dependencies
-This unfortunately uses a separate c-library somewhat trivially to convert between f32 and f16. 
-```bash
-git clone https://github.com/Maratyszcza/FP16/
-```
 
 ### Clone the repo and build
 ```bash
-git clone https://github.com/rbitr/llama2.f90
-cd llama2.f90
-```
-Edit the `Makefile` to add the path of FP16/include cloned above. Then make
-
-```bash
+git clone https://github.com/rbitr/llm.f90
+cd llm.f90
 make
 ```
 
-### Get a model file, or convert a pytorch model with llama.cpp:
+### Get a model file (supports GGUF format)
+
+This is a 1.1B parameter llama model converted into 32-bit gguf. See https://huggingface.co/Tensoic/Tiny-Llama-openhermes-1.1B-step-715k-1.5T for the model info
 
 ```bash
-wget https://huggingface.co/SlyEcho/open_llama_3b_v2_gguf/resolve/main/open-llama-3b-v2-f16.gguf
+wget https://huggingface.co/SDFASDGA/llm/resolve/main/ggml-model-f32.gguf
 ```
-
-### Convert to compatible format
-```bash
-./load -i <model file you downloaded> -o <output file> -t <output vocab file>
-```
-Notes: 
-
-1. The programs could be trivially changed to read ggml directly, but it would look more complicated
-
-2. If you have another vocab file it may work better. The ggml files use unicode as a placehodler for spaces and it's currently handled in a hacky way.
 
 ### Run the model
 
 ```bash
-./llm -m ./models/llama3b.bin -s ./models/3btokens.bin -v -t 0.9 -p "I stopped posting in knitting forums becuase" -n 128
- Embedding dimension:         3200
- Hidden dimension:         8640
- Layers:           26
+$ ./llm -m ggml-model-f32.gguf -t 0.9 -v -n 96 -p "I stopped posting on knitting forums because"
+ Embedding dimension:         2048
+ Hidden dimension:         5632
+ Layers:           22
  Heads:           32
- kv Heads:           32
- Vocabulary Size:       -32000
+ kv Heads:            4
+ Vocabulary Size:        32000
  Sequence Length:         2048
- loaded embedding weights:   102400000
- loaded rms att weights:       83200
- loaded wq weights:   266240000
- loaded wk weights:   266240000
- loaded wv weights:   266240000
- loaded wo weights:   266240000
- loaded rms ffn  weights:       83200
- loaded w1 weights:   718848000
- loaded w2 weights:   718848000
- loaded w3 weights:   718848000
- loaded rms_final weights:        3200
- loaded freq cis real  weights:      102400
- loaded freq_cis_imag weights:      102400
- loaded wcls weights:   102400000
+ head size           64
+ kv head Size          256
+ loaded embedding weights:    65536000
+ loaded rms att weights:       45056
+ loaded wq weights:    92274688
+ loaded wk weights:    11534336
+ loaded wv weights:    11534336
+ loaded wo weights:    92274688
+ loaded ffn norm weights:       45056
+ loaded w1 (gate) weights:   253755392
+ loaded w2 (down) weights:   253755392
+ loaded w3 (up) weights:   253755392
+ loaded output norm weights:        2048
+ loaded classifier weights:    65536000
+ loading tokens
+found 32000 tokens
+found 32000 scores
+ maximum token length           48
  Loaded weights
-I stopped posting in knitting forums becuase I felt like everything I posted was either old or everyone knew about it. I didn't want to talk about the same things over and over and over again. So now I post on my blog and then feel like I can talk about whatever I want here and no one's gonna know about it. It's awesome.<0x0A>It's also easier to see things in categories, here, than in knitting forums. I have the question on the back burner. I have the question that has been bugging me for ever. I have the question that I don't know 
- Inference time:    61.8550034      seconds
-   2.05318880     tokens/second
+I stopped posting on knitting forums because I couldn't find the 
+knitters I was looking for, and it often seemed that no longer 
+interested knitters would post here. Groups like Ravelry and 
+Knitters' Yarn Added are important to all of us, and I really thought 
+it was time for our own site to be my own place to showcase my work, 
+to find people who were interested in knitting, and on and on. 
+ Inference time:    22.5280018      seconds
+   4.21697426     tokens/second
  Timings
-           1   118.843750    
-           2  0.187500000    
-           3   2.86718750    
-           4   349.429688    
-           5   14.7890625
+           1   26.6666660    
+           2   0.00000000    
+           3   0.00000000    
+           4   192.000000    
+           5   17.3333340 
 ```
 
-## Notes 
-
-Most of the model is well parallelized, I estimate it runs almost 10x faster on my 12 virtual core machine since I parallelized it. The compiler options are for maximum speed, and from my brief evaluation, gfortran is successfully using SIMD (AVX2 on my machine). In my tests it runs only very slightly slower than llama.cpp. I welcome advice on how to make it faster (on a CPU).
-
-Originally I based this off of Andrej Karpathy's llama.c. Check the "legacy" branch for a bit more information. The model file format is the same one he used, and the legacy branch will run his "tiny" models. I broke the format here it use 16-bit quantization in the majority of the weights.
-
-Confusingly, the four_bit branch uses the 32-bit llama.c model format. I plan to update it to use converted 4-bit ggml files directly.
-
-As explained more below, I don't to make a complicated program with lots of options, I'd rather have separate versions that can be adapted for different things.
 
 
-## Some extra information
+## Motivation
 
 I wrote [earlier](http://marble.onl/posts/why_host_your_own_llm.html) that I think language model *inferenece* should be self-hosted for most non-trivial uses. A big reason for this is that LLMs are still a new and rapidly evolving technology and that being able to "hack" the implementation is important to make the best use of them. A corollary to being able to hack the implementation is being able to easily understand and modify the code. The requirements for a hackable model are at odds with the requirements for a framework that has lots of composable parts and works across many platforms. What I want, and see a niche for, is something that's dead simple, where the only abstraction is linear algebra and matrix operations, but is also fast enough to run inference at competitive speeds on normal hardware. 
 
