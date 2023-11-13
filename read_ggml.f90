@@ -1,13 +1,5 @@
 ! load.f90
 
-module precision_module
-  implicit none
-  integer, parameter :: wp = kind(1.0)
-  ! not portable?
-  integer, parameter :: ip4 = 1
-  integer, parameter :: qk4 = 32
-end module precision_module
-
 module mixed_type_module
   use precision_module
   implicit none
@@ -20,7 +12,7 @@ module mixed_type_module
         integer(4) :: i32
         !integer(2) :: i16
         real(4) :: f32
-        character(64)  :: string 
+        character(64)  :: string
         type(multi_type), allocatable :: a(:)
   end type
 
@@ -44,137 +36,41 @@ module mixed_type_module
 
 end module
 
-module arg_parse
-        implicit none
 
-        type args
-                character(:), allocatable :: infile
-                character(:), allocatable :: outfile
-                character(:), allocatable :: tokenizer_file
-                logical :: verbose
-        end type args
+module read_ggml
 
-        contains
-
-                subroutine parse_args(arg_values)
-                        type(args) :: arg_values
-                        integer :: i, num_args
-                        character(256) :: arg
-
-
-
-                        !defaults 
-                        arg_values%verbose = .false.
-                        arg_values%infile = ""
-                        arg_values%outfile = ""
-                        arg_values%tokenizer_file = ""
-
-                        num_args = command_argument_count()
-
-                        i = 1
-                        do while (i <= num_args)
-                                call get_command_argument(i, arg)
-                                        select case (arg)
-                                                case ('-i', '--infile')
-                                                ! input ggml file
-                                                call get_command_argument(i+1, arg)
-                                                arg_values%infile = trim(arg)
-                                                i = i + 2
-                                                case ('-o', '--outfile')
-                                                ! output model file
-                                                call get_command_argument(i+1, arg)
-                                                arg_values%outfile = trim(arg)
-                                                i = i + 2
-                                                case ('-t', '--tokenizer_file')
-                                                ! optionally write tokenizer file
-                                                call get_command_argument(i+1, arg)
-                                                arg_values%tokenizer_file = trim(arg)
-                                                i = i + 2
-                                                case ('-v', '--verbose')
-                                                ! print additional information
-                                                arg_values%verbose = .true.
-                                                i = i + 1
-                                                case default
-                                                print *, 'Unrecognized option:', trim(arg)
-                                                stop
-                                                end select
-                        end do
-
-                        if (arg_values%infile .eq. "") then
-                                print *, "Input file required"
-                                stop
-                        !else if (arg_values%outfile .eq. "") then
-                        !        print *, "Output file required"
-                        !        stop
-                        end if 
-
-
-                end subroutine
-
-end module arg_parse
-
-
-!module conversions
-!        use iso_c_binding
-!        !use quants
-!        use precision_module
-!        implicit none
-!
-!        interface
-!                pure function float_to_half_c(x) bind(C, name="float_to_half")
-!                        use iso_c_binding
-!                        real(c_float), value :: x
-!                        integer(c_int16_t) :: float_to_half_c
-!                end function float_to_half_c
-!
-!               pure function half_to_float_c(h) bind(C, name="half_to_float")
-!                        use iso_c_binding
-!                        integer(c_int16_t), value :: h
-!                        real(c_float) :: half_to_float_c
-!                end function half_to_float_c
-!
-!                function pack2x4_c(xi0, xi1) bind(C, name="pack2x4")
-!                        use iso_c_binding
-!                        integer(c_int8_t), value :: xi0, xi1
-!                        integer(c_int8_t) :: pack2x4_c
-!                end function pack2x4_c
-!
-!                function unpack_high_c(x) bind(C, name="unpack_high")
-!                        use iso_c_binding
-!                        integer(c_int8_t), value :: x
-!                        integer(c_int8_t) :: unpack_high_c
-!                end function unpack_high_c
-!
-!                function unpack_low_c(x) bind(C, name="unpack_low")
-!                        use iso_c_binding
-!                        integer(c_int8_t), value :: x
-!                        integer(c_int8_t) :: unpack_low_c
-!                end function unpack_low_c
-!
-!        end interface
-!
-!end module 
-
-program load
         use precision_module
         use mixed_type_module
-        use conversions
-        use arg_parse
+        use weight_module
         implicit none
-
-        character(len=64) :: filename, outfile
-        integer(4) :: magic, version
-        integer(8) :: tensor_count, kv_pairs
+        
+        type(ggml_tensor_info), allocatable :: tensors(:)
         logical :: verbose
+        !integer :: file_pos
+        integer(8) :: tensor_count
+        logical, parameter :: verbose2 = .false.
+contains
+        subroutine load_ggml(filename, w, c, vocab, scores, token_lengths, v)
+        character(len=*), intent(in) :: filename
+        type(TransformerWeights), intent(out) :: w
+        type(Config), intent(out) :: c
+        real(kind=wp), allocatable, intent(out) :: scores(:)
+        character(:), dimension(:), allocatable, intent(out) :: vocab
+        integer(4), allocatable, intent(out) :: token_lengths(:)
+        logical, intent(in) :: v
+        
+        character(:), dimension(:), allocatable :: vocab_swp
+        integer(4) :: magic, version
+        integer(8) :: kv_pairs
         !class(*), allocatable :: demo
         integer :: max_len = 64
-        integer :: i, j, val_type, file_pos, alignment, deficit 
+        integer :: i, j, val_type,file_pos,  alignment, deficit 
         integer(4) :: num_layers, emb_length, context_length, head_count, ffn_length, kv_heads, vocab_size
         type(multi_type), allocatable :: values(:)
         type(multi_type) :: multi_temp
         character(:), dimension(:), allocatable :: keys
         !type(multi_type), allocatable :: x(:) 
-        type(ggml_tensor_info), allocatable :: tensors(:)
+        !type(ggml_tensor_info), allocatable :: tensors(:)
         type(ggml_tensor_info) :: t0
         !demo = 3
         integer(1) :: tbyte
@@ -186,12 +82,12 @@ program load
         real(kind=wp), allocatable :: temp2f32(:,:)
         character(:), allocatable :: tempstr
         type(generic_tensor) :: temp_gt
-        type (args) :: arg_values
+        !type (args) :: arg_values
 
 
-        real(kind=wp), allocatable :: scores(:)
-        character(:), dimension(:), allocatable :: vocab
-        integer(4), allocatable :: token_lengths(:)
+        !real(kind=wp), allocatable :: scores(:)
+        !character(:), dimension(:), allocatable :: vocab
+        !integer(4), allocatable :: token_lengths(:)
         integer(8) :: tmp_vocab_size
         integer(4) :: temp_int, maxlen
 
@@ -199,17 +95,10 @@ program load
 
         character(:), allocatable :: loaded_str
         
+        integer :: head_size, kv_head_size
         
         allocate(character(len=max_len) :: tempstr)
-        !allocate(x(10))
-        
-        !filename = "/mnt/ssd/llm/models/open_llama_3b_v2/ggml-model-f16.gguf"
-        !outfile = "fortran3b.bin"
-
-        call parse_args(arg_values)
-        verbose = arg_values%verbose
-        filename = arg_values%infile
-        outfile = arg_values%outfile 
+        verbose = v
         
         ! assumed to be 32 if not specified
         alignment = 32
@@ -255,17 +144,17 @@ program load
                         else if (keys(i) .eq. "llama.context_length") then
                                 context_length = values(i)%i32
                         else if (keys(i) .eq. "tokenizer.ggml.tokens") then
-                                vocab_size = (-size(values(i)%a))
+                                vocab_size = (size(values(i)%a))
                         else if (keys(i) .eq. "llama.attention.head_count_kv") then
                                 kv_heads = values(i)%i32
                         else if (keys(i) .eq. "llama.feed_forward_length") then
                                 ffn_length = values(i)%i32
                         end if
                         
-                        
+                        if (verbose) then
                         print *, keys(i)
                         call print_multi(values(i))
-                        !print *, values(i)%item
+                        end if
                 end do
 
                 allocate(tensors(tensor_count))
@@ -273,7 +162,8 @@ program load
                         tensors(i) = read_tensor_info(5)
                 end do
 
-                if (verbose) then
+                ! "level 2 verbose"
+                if (verbose2) then
                         do i = 1, tensor_count
                                 write (*, fmt="(A20,I2)",advance="no") tensors(i)%tname, tensors(i)%ndim
                                 do j=1,tensors(i)%ndim
@@ -287,8 +177,10 @@ program load
 
                 deficit = mod(file_pos-1,alignment) ! -1
 
+                if (verbose) then
                 print *, "Position", file_pos
                 print *, "Deficit", deficit
+                end if
 
                 if (deficit > 0) then
                 do i = 1,(alignment-deficit)
@@ -303,103 +195,202 @@ program load
 
                 print *, "data offset", file_pos
 
-                read(5) f16
+                !read(5) f16
                
                 !print *, "First value", half_to_float_c(f16) 
 
-                t0 = tensor_by_name("token_embd.weight")
-                temp_gt = read_layer(5,t0)
               
-                if (outfile /= "") then
-                open(unit=8, file=outfile, form='unformatted', status='unknown', ACCESS="STREAM", action="write")
+                !if (outfile /= "") then
+                !open(unit=8, file=outfile, form='unformatted', status='unknown', ACCESS="STREAM", action="write")
                 ! write the header:
                 if (verbose) then 
-                        print *, "Header:"
-                        print *, emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
+                        if (verbose) then
+                        print *, "Embedding dimension: ", emb_length
+                        print *, "Hidden dimension: ", ffn_length
+                        print *, "Layers: ", num_layers
+                        print *, "Heads: ", head_count
+                        print *, "kv Heads: ", kv_heads
+                        print *, "Vocabulary Size: ", vocab_size
+                        print *, "Sequence Length: ", context_length
+
+                end if
+
+                        !print *, "Header:"
+                        !print *, emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
                 end if 
-                write(8) emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
-       
+                !write(8) emb_length, ffn_length, num_layers, head_count, kv_heads, vocab_size, context_length
+                c%emb_dim = emb_length
+                c%hidden_dim = ffn_length
+                c%n_layers = num_layers
+                c%n_heads = head_count
+                c%n_kv_heads = kv_heads
+                c%vocab_size = vocab_size
+                c%seq_len = context_length 
+                
+                head_size = emb_length / head_count
+                kv_head_size = kv_heads * head_size
+                
+                if (verbose) then
+                print *, "head size ", head_size
+                print *, "kv head Size ", kv_head_size
+                end if
 
-                call write_tensor(8,temp_gt)
+                t0 = tensor_by_name("token_embd.weight")
+                temp_gt = read_layer(5,t0,file_pos)
 
+                !call write_tensor(8,temp_gt)
+                w%token_embedding_table = temp_gt%f322d
+
+                if (verbose) then
+                        print *, "loaded embedding weights:", size(w%token_embedding_table)
+                end if
+                !print *, temp_gt%ttype
+                !print *, temp_gt%ndims
+                !print *, w%token_embedding_table(1:10,1)
+                !print *, "embed sum: ", sum(w%token_embedding_table(1:10,1:10))
+
+                allocate(w%rms_att_weight(emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_norm.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! should be f32
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%rms_att_weight(:,i) = temp_gt%f321d
                 end do
+                if (verbose) then
+                        print *, "loaded rms att weights:", size(w%rms_att_weight)
+                end if
 
-                !print *, "norm 26: ", (temp_gt%f321d(1))
-
+                allocate(w%wqkv(emb_length,emb_length+2*kv_head_size,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_q.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%wqkv(:,1:emb_length,i) = temp_gt%f322d
                 end do 
+
+                if (verbose) then
+                        print *, "loaded wq weights:", size(w%wqkv(:,1:emb_length,:))
+                end if
+
                
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_k.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16 
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%wqkv(:,(emb_length+1):(emb_length+kv_head_size),i) = temp_gt%f322d
                 end do
+
+                if (verbose) then
+                        print *, "loaded wk weights:", size(w%wqkv(:,(emb_length+1):(emb_length+kv_head_size),:))
+                end if
+
 
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_v.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%wqkv(:,(emb_length+kv_head_size+1):(emb_length+2*kv_head_size),i) = temp_gt%f322d
                 end do
 
+                !print *, "qkv sum: ", sum(w%wqkv)
+                if (verbose) then
+                        print *, "loaded wv weights:", size(w%wqkv(:,(emb_length+kv_head_size+1):,:))
+                end if
+
+
+
+                allocate(w%wo(emb_length,emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_output.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%wo(:,:,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded wo weights:", size(w%wo)
+                end if
+
+
+                allocate(w%rms_ffn_weight(emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_norm.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f32
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%rms_ffn_weight(:,i) = temp_gt%f321d
                 end do
 
+                if (verbose) then
+                        print *, "loaded ffn norm weights:", size(w%rms_ffn_weight)
+                end if
+
+
+                allocate(w%w13(emb_length,2*ffn_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_gate.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%w13(:,1:ffn_length,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded w1 (gate) weights:", size(w%w13(:,1:ffn_length,:))
+                end if
+
+
+                allocate(w%w2(ffn_length,emb_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_down.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%w2(:,:,i) = temp_gt%f322d
                 end do
+
+                if (verbose) then
+                        print *, "loaded w2 (down) weights:", size(w%w2)
+                end if
+
 
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_up.weight"
                         t0 = tensor_by_name(tempstr)
-                        temp_gt = read_layer(5,t0)
+                        temp_gt = read_layer(5,t0,file_pos)
                         ! f16
-                        call write_tensor(8,temp_gt)
+                        !call write_tensor(8,temp_gt)
+                        w%w13(:,(ffn_length+1):,i) = temp_gt%f322d
                 end do
 
+                if (verbose) then
+                        print *, "loaded w3 (up) weights:", size(w%w13(:,(ffn_length+1):,:))
+                end if
+
+
                 t0 = tensor_by_name("output_norm.weight")
-                temp_gt = read_layer(5,t0)
+                temp_gt = read_layer(5,t0,file_pos)
                 ! f32
-                call write_tensor(8,temp_gt)
+                !call write_tensor(8,temp_gt)
+                w%rms_final_weight = temp_gt%f321d
+
+                if (verbose) then
+                        print *, "loaded output norm weights:", size(w%rms_final_weight)
+                end if
+
 
                 !temp2f32 = get_rope_freqs(emb_length/head_count,context_length,10000.0)
                 !if (verbose) then
@@ -413,14 +404,20 @@ program load
                 ! cos and sin of the above are the cos/sin respectively (f32)
 
                 t0 = tensor_by_name("output.weight")
-                temp_gt = read_layer(5,t0)
+                temp_gt = read_layer(5,t0,file_pos)
                 ! f16
-                call write_tensor(8,temp_gt)
-        
-        close(8)
-        end if ! writing outfile 
+                !call write_tensor(8,temp_gt)
+                w%wcls = temp_gt%f322d
 
-        if (arg_values%tokenizer_file /= "") then
+                if (verbose) then
+                        print *, "loaded classifier weights:", size(w%wcls)
+                end if
+
+
+        !close(8)
+        !end if ! writing outfile 
+
+        if (.true.) then
                 ! just read and write the values again:
                 call fseek(5,0,0) 
                 read(5) magic, version, tensor_count, kv_pairs
@@ -433,7 +430,7 @@ program load
                 do i = 1,kv_pairs
                         tempstr = read_str(5)
                         read(5) val_type
-                        if (verbose) then
+                        if (verbose2) then
                         print *, "scanning ", tempstr
                         end if
                         if (tempstr .eq. "tokenizer.ggml.tokens") then
@@ -474,13 +471,15 @@ program load
                         end if
                 end do
 
-                open(unit=8, file=arg_values%tokenizer_file, form='unformatted', status='unknown', ACCESS="STREAM", action="write")
+                !open(unit=8, file="", form='unformatted', status='unknown', ACCESS="STREAM", action="write")
                 maxlen = maxval(token_lengths)
+                
+                allocate(character(len=max_len) ::  vocab_swp(tmp_vocab_size))
                 if (verbose) then
                 print *, "maximum token length ", maxlen
                 end if
                 !temp_int = 10
-                write(8) maxlen 
+                !write(8) maxlen 
                 do i=1,size(vocab)
                 read(vocab(i)(1:1), "(A)") tbytes(1)
                 read(vocab(i)(2:2), "(A)") tbytes(2)
@@ -493,20 +492,24 @@ program load
                 allocate(character(token_lengths(i)-2) :: loaded_str)
                 loaded_str(1:1) = " "
                 loaded_str(2:) = vocab(i)(4:token_lengths(i))
-                write(8) scores(i),token_lengths(i)-2,loaded_str
+                !write(8) scores(i),token_lengths(i)-2,loaded_str
+                token_lengths(i) = token_lengths(i)-2
+                vocab_swp(i) = loaded_str
                 deallocate(loaded_str)
                 else
-                write(8) scores(i),token_lengths(i),vocab(i)(1:token_lengths(i))
+                !write(8) scores(i),token_lengths(i),vocab(i)(1:token_lengths(i))
+                vocab_swp(i) = vocab(i)(1:token_lengths(i))
         end if
                 end do
 
         end if
 
-        close(8)
+        !close(8)
 
         close(5)
+        vocab = vocab_swp
+        end subroutine
 
-contains 
         
         subroutine write_tensor(handle, t)
                 integer :: handle
@@ -585,7 +588,7 @@ contains
                 if (verbose) then
                         write(*,"(A,A26)",advance="no") "reading",layer%tname 
                 end if
-                call fseek(handle,layer%offset+file_pos,0)
+                !call fseek(handle,layer%offset+file_pos,0)
                 allocate(d(prod(layer%dims)))
                 read(handle) d
                 if (verbose) then
@@ -594,14 +597,15 @@ contains
 
         end function 
 
-        function read_layer(handle, layer) result(d)
+        function read_layer(handle, layer,file_pos) result(d)
                 integer :: handle
                 type(ggml_tensor_info) :: layer
                 type(generic_tensor) :: d
+                integer :: file_pos
                 !integer(2), allocatable :: d(:)
-                if (verbose) then
-                        write(*,"(A,A26)",advance="no") "reading",layer%tname
-                end if
+                !if (verbose) then
+                !        write(*,"(A,A26)",advance="no") "reading",layer%tname
+                !end if
                 call fseek(handle,layer%offset+file_pos-1,0)
                 d%ttype = layer%ttype
                 d%ndims = layer%ndim
@@ -630,9 +634,9 @@ contains
                         print *, "Type not supported", layer%ttype
                 end if
                 
-                if (verbose) then
-                        write(*,"(A)") "... done"
-                end if
+                !if (verbose) then
+                !        write(*,"(A)") "... done"
+                !end if
 
         end function   
         
@@ -714,4 +718,4 @@ contains
         end function
         
 
-end program
+end module

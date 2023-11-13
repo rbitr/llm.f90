@@ -1,25 +1,24 @@
-F16DIR = /home/andrew/code/scratch/fortran/scratch/sixteenbit/FP16/include/
 FORTRAN = gfortran-10
 GCC = gcc-10
 
 .DEFAULT_GOAL := all
 
-convert.o: convert.c
-	$(GCC) -c -O3 -I$(F16DIR) convert.c -lm
+weight_module.o: weight_module.f90 
+	$(FORTRAN) -c -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC weight_module.f90
 
-llama2.o: llama2.f90
-	$(FORTRAN) -c -O3 -march=native -ffast-math -funroll-loops -fopenmp llama2.f90 
+llama2.o: llama2.f90 
+	$(FORTRAN) -c -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC llama2.f90  
+read_ggml.o: read_ggml.f90
+	$(FORTRAN) -c -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC read_ggml.f90
 
-llm: convert.o llama2.o
-	$(FORTRAN) convert.o llama2.o -fopenmp -o llm
+llm: weight_module.o read_ggml.o llama2.o 
+	$(FORTRAN) -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC weight_module.o read_ggml.o llama2.o -o llm 
 
-load.o: load.f90
-	$(FORTRAN) -c load.f90
+load: load.f90
+	$(FORTRAN) -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC load.f90 -o load 
+	
 
-load: convert.o load.o
-	$(FORTRAN) convert.o load.o -o load
-
-all: load llm
+all: llm
 
 clean:
 	rm *.o

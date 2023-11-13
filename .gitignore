@@ -3,6 +3,8 @@ load
 *.bin
 *.mod
 models/*
+models1b
+models1b/*
 *.o
 massif*
 models
