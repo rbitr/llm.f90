@@ -75,7 +75,7 @@ to find people who were interested in knitting, and on and on.
 
 ### Notes
 
-The base version currently hard codes the model parameters. This is trivially changed with some uncommenting that will let you load any llama2 model. For anything much bigger (depending on your computer) the suggested branch is rbitr/llama2.f90/tree/version_0 than implements 16-bit floats and parallelism but has not been optimized. To use this branch you will have to get a .gguf version of the model and then convert it as described in the readme.
+The base version currently hard codes the model parameters. This is trivially changed with some uncommenting that will let you load any llama2 model. For anything much bigger (depending on your computer) the suggested branch is [rbitr/llama2.f90/tree/version_0](rbitr/llama2.f90/tree/version_0) than implements 16-bit floats and parallelism but has not been optimized. To use this branch you will have to get a .gguf version of the model and then convert it as described in the readme.
 
 Models may load slightly faster if you convert to the "ak" file format (from Andrej Karpathy's llama2.c) and load that instead. 
 
