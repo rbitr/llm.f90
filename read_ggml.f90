@@ -177,8 +177,10 @@ contains
 
                 deficit = mod(file_pos-1,alignment) ! -1
 
+                if (verbose) then
                 print *, "Position", file_pos
                 print *, "Deficit", deficit
+                end if
 
                 if (deficit > 0) then
                 do i = 1,(alignment-deficit)
