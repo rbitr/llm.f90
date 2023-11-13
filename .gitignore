@@ -8,3 +8,4 @@ models1b/*
 *.o
 massif*
 models
+*.swp
