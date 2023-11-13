@@ -4,7 +4,6 @@
 
 Hackable large language model inference in pure Fortran. Builds to a ~100k executable that can be run efficiently on a CPU and has zero external dependencies. Between this and sibling project https://github.com/rbitr/ferrite you can create and customize a retrieval augmented (RAG) or other complete language model system.
 
-
 ## Getting started
 
 The base implementation in the `master` branch runs on a single core only. See the roadmap below for more info on what has been done and what is planned.
