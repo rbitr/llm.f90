@@ -1,7 +1,13 @@
-# llm.f90 (formerly llama2.f90)
-Hackable largre language model inference in pure Fortran
+# llm.f90 
+
+(formerly llama2.f90)
+
+Hackable large language model inference in pure Fortran. Builds to a ~100k executable that can be run efficiently on a CPU and has zero external dependencies. Between this and sibling project https://github.com/rbitr/ferrite you can create and customize a retrieval augmented (RAG) or other complete language model system.
+
 
 ## Getting started
+
+The base implementation in the `master` branch runs on a single core only. See the roadmap below for more info on what has been done and what is planned.
 
 
 ### Clone the repo and build
@@ -65,11 +71,30 @@ to find people who were interested in knitting, and on and on.
            5   17.3333340 
 ```
 
+### Options
 
+### Notes
+
+The base version currently hard codes the model parameters. This is trivially changed with some uncommenting that will let you load any llama2 model. For anything much bigger (depending on your computer) the suggested branch is XXXXX than implements 16-bit floats and parallelism but has not been optimized. To use this branch you will have to get a .gguf version of the model and then convert it as described in the readme.
+
+Models may load slightly faster if you convert to the "ak" file format (from Andrej Karpathy's llama2.c) and load that instead. 
+
+## Features and Roadmap
+
+If you want to use `llm.f90` for a project and need support, please get in touch. See the `motivation` section below for information about the "philosophy". We want any features added to not add complexity, so for example quantization will be written as a separate program.
+
+- :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv)
+- :construction: Parallelism: see /rbitr/llama2.f90/tree/f16_convert
+- :construction: Quantization: see /rbitr/llama2.f90/tree/f16_convert and /rbitr/llama2.f90/tree/four_bit_dev for 16-bit and 4-bit respectively
+- :soon: Support for other models
+- :soon: Test on other architectures machines (Apple, other ARM, etc). Please open issues for any feedback.
+- :soon: ... 
+
+Note that :construction: means features that have a "legacy" implementation that works but uses older model file formats and may have other breaking changes. The plan is to roll these into the current `master` branch while preserving speed optimizations and direct loading of gguf files.
 
 ## Motivation
 
-I wrote [earlier](http://marble.onl/posts/why_host_your_own_llm.html) that I think language model *inferenece* should be self-hosted for most non-trivial uses. A big reason for this is that LLMs are still a new and rapidly evolving technology and that being able to "hack" the implementation is important to make the best use of them. A corollary to being able to hack the implementation is being able to easily understand and modify the code. The requirements for a hackable model are at odds with the requirements for a framework that has lots of composable parts and works across many platforms. What I want, and see a niche for, is something that's dead simple, where the only abstraction is linear algebra and matrix operations, but is also fast enough to run inference at competitive speeds on normal hardware. 
+See [earlier](http://marble.onl/posts/why_host_your_own_llm.html) for why language models *inferenece* should be self-hosted for most non-trivial uses. A big reason for this is that LLMs are still a new and rapidly evolving technology and that being able to "hack" the implementation is important to make the best use of them. A corollary to being able to hack the implementation is being able to easily understand and modify the code. The requirements for a hackable model are at odds with the requirements for a framework that has lots of composable parts and works across many platforms. There is a niche for, is something that's dead simple, where the only abstraction is linear algebra and matrix operations, but is also fast enough to run inference at competitive speeds on normal hardware. 
 
 [Pytorch](https://pytorch.org/) is a full featured framework but is highly abstracted and not optimized for CPU inference. [Llama.cpp / ggml](https://github.com/ggerganov/llama.cpp) is well optimized for a wide range of hardware and has a simpler project structure compared to pytorch that increases hackability. However as of writing, ggml.c is 20k lines and llama.cpp is 7k. The hand optimization across many platforms plus big range of options (all of which make it a good, full featured software project) make it heavy to work with. [Llama2.c](https://github.com/karpathy/llama2.c) (the names are confusing and I may change the name of this project) is very hackable (although less than when it started) and simple to understand. It is not optimized; while in principle it could be, it will still be a C program that requires memory management and manual vector / matrix operations.
 
@@ -82,8 +107,8 @@ I wrote [earlier](http://marble.onl/posts/why_host_your_own_llm.html) that I thi
 |Memory and linalg| x | | | x |
 
 
-What I want to do with Llama2.f90 is retain the hackability of llama2.c, but with the speed of Llama.cpp (currently we achieve comparable speeds on CPU) and the matrix and memory support of Fortran. So far optimization has not significantly diminished the readability or understandability of the code. The goal is not a framework that can be called from other programs, but example source code that can be modified directly for custom use. The hope is that such modifications will be as easy or easier than working with a high level framework. At the same time, we provide the capability of running an LLM from the command line. 
+The plan is to retain the hackability of llama2.c, but with the speed of Llama.cpp (currently we achieve comparable speeds on CPU) and the matrix and memory support of Fortran. So far optimization has not significantly diminished the readability or understandability of the code. The goal is not a framework that can be called from other programs, but example source code that can be modified directly for custom use. The hope is that such modifications will be as easy or easier than working with a high level framework. At the same time, we provide the capability of running an LLM from the command line. 
 
-Additional options, such as quantization (under development), I prefer to include in dedicated programs instead of as branches of one main program. Likewise if we decide to support another model. In this way (hopefully) we keep everything simple and easy to use and hack elsewhere.
+Additional options, such as quantization (under development), are preferred to be added as in dedicated programs instead of as branches of one main program. Likewise if we decide to support another model. In this way (hopefully) we keep everything simple and easy to use and hack elsewhere.
 
 
