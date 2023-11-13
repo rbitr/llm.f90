@@ -6,3 +6,4 @@ models/*
 *.o
 massif*
 models
+*.swp
