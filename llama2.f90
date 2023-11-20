@@ -82,7 +82,32 @@ module arg_parse
 
 end module arg_parse
 
+module f32_convert
+        use iso_c_binding
+        implicit none
 
+        interface
+                subroutine c_half_to_float_array(in_array, out_array, si) bind(C, name="half_to_float_array_simd")
+                use iso_c_binding
+                        integer(c_int16_t), intent(in) :: in_array(*)
+                        real(c_float), intent(out) :: out_array(*)
+                        integer(c_int), value :: si
+                end subroutine c_half_to_float_array
+        
+                function c_dot_half_to_float_array(input_fp32, input_fp16, si) &
+                                &bind(C, name="dot_product_fp16_fp32_v2")
+                use iso_c_binding
+                        integer(c_int16_t), intent(in) :: input_fp16(*)
+                        real(c_float), intent(in) :: input_fp32(*)
+                        real(c_float) :: c_dot_half_to_float_array
+                        integer(c_int), value :: si
+                end function c_dot_half_to_float_array
+        
+        end interface
+
+        !float dot_product_fp16_fp32(const uint16_t* input_fp16, const float* input_fp32, int size)
+        
+end module f32_convert
 
 program llama2 
         use iso_c_binding
@@ -90,6 +115,7 @@ program llama2
         use weight_module
         use arg_parse
         use read_ggml, only: load_ggml
+        use f32_convert
         !use omp_lib
 
         implicit none
@@ -412,7 +438,13 @@ program llama2
 
 ! functions 
 contains 
-
+        
+        function v_half_to_float_c(h)
+                integer(2), intent(in) :: h(:)
+                real(kind=wp) :: v_half_to_float_c (size(h))
+                integer :: i
+                call c_half_to_float_array(h,v_half_to_float_c,size(h))
+        end function
 
         function time_ms() result(t_ms)
                 real(kind=wp) :: t_ms
@@ -517,8 +549,8 @@ contains
                 logits(:) = 0
 
                 ! convert precision        
-                x = fp16_to_real32(w%token_embedding_table(:,token))
-
+                !x = fp16_to_real32(w%token_embedding_table(:,token))
+                x = v_half_to_float_c(w%token_embedding_table(:,token))
 
                 do l = 1,n_layers
                         
@@ -527,7 +559,8 @@ contains
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
                         
                         do ix = 1,size(qkv)
-                        qkv(ix) = dot_product(xb,fp16_to_real32(w%wqkv(:,ix,l)))
+                        !qkv(ix) = dot_product(xb,v_half_to_float_c(w%wqkv(:,ix,l)))
+                        qkv(ix) = c_dot_half_to_float_array(xb,w%wqkv(:,ix,l),emb_dim)
                         end do
                         
                         q => qkv(1:emb_dim)
@@ -601,14 +634,16 @@ contains
                         time = time_ms()
                         
                         do ix=1,emb_dim
-                        x(ix) = x(ix) + dot_product(xb,fp16_to_real32(w%wo(:,ix,l)))
+                        !x(ix) = x(ix) + dot_product(xb,v_half_to_float_c(w%wo(:,ix,l)))
+                        x(ix) = x(ix) + c_dot_half_to_float_array(xb,w%wo(:,ix,l),emb_dim)
                         end do
                         
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
                         do ix = 1,size(hb13)
-                        hb13(ix) = dot_product(xb,fp16_to_real32(w%w13(:,ix,l)))
+                        !hb13(ix) = dot_product(xb,v_half_to_float_c(w%w13(:,ix,l)))
+                        hb13(ix) = c_dot_half_to_float_array(xb,w%w13(:,ix,l),emb_dim)
                         end do
                         hb => hb13(1:hidden_dim)
                         hb2 => hb13((hidden_dim+1):(2*hidden_dim))
@@ -616,7 +651,8 @@ contains
                         hb = hb*hb2
 
                         do ix = 1,emb_dim
-                        x(ix) = x(ix) + dot_product(hb,fp16_to_real32(w%w2(:,ix,l)))
+                        !x(ix) = x(ix) + dot_product(hb,v_half_to_float_c(w%w2(:,ix,l)))
+                        x(ix) = x(ix) + c_dot_half_to_float_array(hb,w%w2(:,ix,l),hidden_dim)
                         end do
 
                         s%times(4) = s%times(4) + (time_ms() - time)
@@ -632,7 +668,8 @@ contains
                 !        logits = vm_matmul(x,(w%token_embedding_table))
                 !else
                         do ix = 1,vocab_size
-                                logits(ix) = dot_product(x,fp16_to_real32(w%wcls(:,ix)))
+                                !logits(ix) = dot_product(x,v_half_to_float_c(w%wcls(:,ix)))
+                                logits(ix) = c_dot_half_to_float_array(x,w%wcls(:,ix),emb_dim)
                         end do
                 !end if
                 s%times(5) = s%times(5) + (time_ms() - time)
