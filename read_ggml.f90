@@ -42,6 +42,8 @@ module read_ggml
         use precision_module
         use mixed_type_module
         use weight_module
+        use iso_c_binding, only: c_float, c_int16_t, c_ptr, c_size_t, c_f_pointer
+        use alignment_mod
         implicit none
         
         type(ggml_tensor_info), allocatable :: tensors(:)
@@ -96,7 +98,10 @@ contains
         character(:), allocatable :: loaded_str
         
         integer :: head_size, kv_head_size
-        
+       
+        type(c_ptr) :: ptr_fp16
+
+
         allocate(character(len=max_len) :: tempstr)
         verbose = v
         
@@ -262,7 +267,9 @@ contains
                         print *, "loaded rms att weights:", size(w%rms_att_weight)
                 end if
 
-                allocate(w%wqkv(emb_length,emb_length+2*kv_head_size,num_layers))
+                !allocate(w%wqkv(emb_length,emb_length+2*kv_head_size,num_layers))
+                ptr_fp16 = aligned_alloc_16(emb_length*(emb_length+2*kv_head_size)*num_layers*sizeof(w%wqkv))
+                call c_f_pointer(ptr_fp16,w%wqkv,[emb_length,emb_length+2*kv_head_size,num_layers])
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_q.weight"
                         t0 = tensor_by_name(tempstr)
@@ -307,7 +314,10 @@ contains
 
 
 
-                allocate(w%wo(emb_length,emb_length,num_layers))
+                !allocate(w%wo(emb_length,emb_length,num_layers))
+                ptr_fp16 = aligned_alloc_16(emb_length*(emb_length)*num_layers*sizeof(w%wo))
+                call c_f_pointer(ptr_fp16,w%wo,[emb_length,emb_length,num_layers])
+
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_output.weight"
                         t0 = tensor_by_name(tempstr)
@@ -336,8 +346,10 @@ contains
                         print *, "loaded ffn norm weights:", size(w%rms_ffn_weight)
                 end if
 
+                !allocate(w%w13(emb_length,2*ffn_length,num_layers))
+                ptr_fp16 = aligned_alloc_16(emb_length*(2*ffn_length)*num_layers*sizeof(w%w13))
+                call c_f_pointer(ptr_fp16,w%w13,[emb_length,2*ffn_length,num_layers])
 
-                allocate(w%w13(emb_length,2*ffn_length,num_layers))
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_gate.weight"
                         t0 = tensor_by_name(tempstr)
@@ -352,7 +364,10 @@ contains
                 end if
 
 
-                allocate(w%w2(ffn_length,emb_length,num_layers))
+                !allocate(w%w2(ffn_length,emb_length,num_layers))
+                ptr_fp16 = aligned_alloc_16(ffn_length*(emb_length)*num_layers*sizeof(w%w2))
+                call c_f_pointer(ptr_fp16,w%w2,[ffn_length,emb_length,num_layers])
+
                 do i = 1,num_layers
                         write(tempstr,"(A,I0,A)") "blk.", i-1, ".ffn_down.weight"
                         t0 = tensor_by_name(tempstr)

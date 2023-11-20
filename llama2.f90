@@ -116,6 +116,7 @@ program llama2
         use arg_parse
         use read_ggml, only: load_ggml
         use f32_convert
+        use alignment_mod
         !use omp_lib
 
         implicit none
@@ -434,6 +435,11 @@ program llama2
         do l = 1,5
                 print *, l, s%times(l)/seq_len
         end do
+        
+        !call aligned_free(weights%wqkv)
+        !call aligned_free(weights%wo)
+        !call aligned_free(weights%w13)
+        !call aligned_free(weights%w2)
         ! end of __main__       
 
 ! functions 

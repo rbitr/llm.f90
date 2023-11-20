@@ -56,7 +56,8 @@ float dot_product_fp16_fp32_v2(const float* input_fp32, const uint16_t* input_fp
         __m256 single_data2 = _mm256_loadu_ps(input_fp32 + i);
 
         // Multiply and accumulate
-        sum = _mm256_add_ps(sum, _mm256_mul_ps(single_data, single_data2));
+        //sum = _mm256_add_ps(sum, _mm256_mul_ps(single_data, single_data2));
+	sum = _mm256_fmadd_ps(single_data, single_data2, sum);
     }
 
     // Horizontal sum of the resulting vector
