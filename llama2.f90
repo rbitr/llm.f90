@@ -107,7 +107,7 @@ program llama2
         integer, parameter :: vocab_size = 32000
         integer :: seq_len = 2048
 
-        type(TransformerWeights) :: weights
+        type(TransformerWeights16) :: weights
         logical :: shared_weights
         integer :: head_size, kv_head_size, tmp
         type(config) :: conf, dummy_conf
@@ -481,7 +481,7 @@ contains
                 integer, intent(in) :: token, pos
                 !type(Config), intent(in) :: p
                 type(Runstate) :: s
-                type(TransformerWeights), intent(in) :: w
+                type(TransformerWeights16), intent(in) :: w
                 real(kind=wp) :: logits(vocab_size)
 
                 real(kind=wp) :: x(emb_dim)
@@ -517,7 +517,7 @@ contains
                 logits(:) = 0
 
                 ! convert precision        
-                x = w%token_embedding_table(:,token)
+                x = fp16_to_real32(w%token_embedding_table(:,token))
 
 
                 do l = 1,n_layers
@@ -527,7 +527,7 @@ contains
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
                         
                         do ix = 1,size(qkv)
-                        qkv(ix) = dot_product(xb,(w%wqkv(:,ix,l)))
+                        qkv(ix) = dot_product(xb,fp16_to_real32(w%wqkv(:,ix,l)))
                         end do
                         
                         q => qkv(1:emb_dim)
@@ -601,14 +601,14 @@ contains
                         time = time_ms()
                         
                         do ix=1,emb_dim
-                        x(ix) = x(ix) + dot_product(xb,w%wo(:,ix,l))
+                        x(ix) = x(ix) + dot_product(xb,fp16_to_real32(w%wo(:,ix,l)))
                         end do
                         
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
           
                         do ix = 1,size(hb13)
-                        hb13(ix) = dot_product(xb,w%w13(:,ix,l))
+                        hb13(ix) = dot_product(xb,fp16_to_real32(w%w13(:,ix,l)))
                         end do
                         hb => hb13(1:hidden_dim)
                         hb2 => hb13((hidden_dim+1):(2*hidden_dim))
@@ -616,7 +616,7 @@ contains
                         hb = hb*hb2
 
                         do ix = 1,emb_dim
-                        x(ix) = x(ix) + dot_product(hb,w%w2(:,ix,l))
+                        x(ix) = x(ix) + dot_product(hb,fp16_to_real32(w%w2(:,ix,l)))
                         end do
 
                         s%times(4) = s%times(4) + (time_ms() - time)
@@ -632,7 +632,7 @@ contains
                 !        logits = vm_matmul(x,(w%token_embedding_table))
                 !else
                         do ix = 1,vocab_size
-                                logits(ix) = dot_product(x,w%wcls(:,ix))
+                                logits(ix) = dot_product(x,fp16_to_real32(w%wcls(:,ix)))
                         end do
                 !end if
                 s%times(5) = s%times(5) + (time_ms() - time)
@@ -723,6 +723,44 @@ contains
 
         end function
 
+        pure elemental function fp16_to_real32(fp16_value) result(vx)
+                integer(2), intent(in) :: fp16_value
+                real(kind=wp) :: vx
+                integer(4) :: int_value, si, ex, mantissa
 
+                si = ibits(fp16_value, 15, 1)               ! Extract sign bit
+                ex = ibits(fp16_value, 10, 5)           ! Extract exponent
+                mantissa = ibits(fp16_value, 0, 10)           ! Extract mantissa
+
+                ! Adjust exponent from FP16 bias (15) to FP32 bias (127)
+                ex = ex - 15 + 127
+
+        
+                ! If exponent is all 1's, it's a special value (Inf or NaN)
+                if (ex >= 142) then
+                        ! Set exponent to all 1's for FP32
+                        ex = 255
+                        ! If mantissa is not zero, it's NaN
+                        if (mantissa /= 0) then
+                        ! Set mantissa to a non-zero value
+                        mantissa = 1
+                        endif
+                elseif (ex <= 112) then
+                        ! If the FP16 was denormalized, or too small for normalized FP32
+                        ex = 0
+                        mantissa = 0
+                        else
+                        ! Normalize the mantissa by adding the implicit leading 1 and adjusting exponent
+                        mantissa = mantissa * 2**13
+                endif
+
+
+                ! Combine sign, adjusted exponent and mantissa
+                int_value = (ishft(si, 31)) + (ishft(ex, 23)) + mantissa
+
+                ! Transfer the bits back to real32
+                vx = transfer(int_value, vx)
+
+        end function fp16_to_real32
 
 end program llama2

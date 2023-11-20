@@ -8,7 +8,7 @@ weight_module.o: weight_module.f90
 
 llama2.o: llama2.f90 
 	$(FORTRAN) -c -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC llama2.f90  
-read_ggml.o: read_ggml.f90
+read_ggml.o: read_ggml.f90 weight_module.o
 	$(FORTRAN) -c -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC read_ggml.f90
 
 llm: weight_module.o read_ggml.o llama2.o 

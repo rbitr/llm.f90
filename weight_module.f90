@@ -2,6 +2,7 @@
 module precision_module
   implicit none
   integer, parameter :: wp = kind(1.0)
+  integer, parameter :: f16p = 2
 end module precision_module
 
 ! structs for reading weights, config information and state 
@@ -19,11 +20,23 @@ module weight_module
                 real(kind=wp), allocatable :: w13(:,:,:)
                 real(kind=wp), allocatable :: w2(:,:,:)
                 real(kind=wp), allocatable :: rms_final_weight(:)
-                !real(kind=wp), allocatable :: freq_cis_real(:,:)
-                !real(kind=wp), allocatable :: freq_cis_imag(:,:)
                 real(kind=wp), allocatable :: wcls(:,:)
 
         end type TransformerWeights
+
+        type TransformerWeights16
+                integer(f16p), allocatable :: token_embedding_table(:,:)
+                real(kind=wp), allocatable :: rms_att_weight(:,:)
+                real(kind=wp), allocatable :: rms_ffn_weight(:,:)
+                integer(f16p), allocatable :: wqkv(:,:,:)
+                integer(f16p), allocatable :: wo(:,:,:)
+                integer(f16p), allocatable :: w13(:,:,:)
+                integer(f16p), allocatable :: w2(:,:,:)
+                real(kind=wp), allocatable :: rms_final_weight(:)
+                integer(f16p), allocatable :: wcls(:,:)
+
+        end type TransformerWeights16
+
 
         type Config
                 integer :: emb_dim, hidden_dim, n_layers, n_heads, n_kv_heads, vocab_size, seq_len
