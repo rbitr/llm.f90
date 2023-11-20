@@ -18,16 +18,60 @@ make
 
 ### Get a model file (supports GGUF format)
 
-This is a 1.1B parameter llama model converted into 32-bit gguf. See https://huggingface.co/Tensoic/Tiny-Llama-openhermes-1.1B-step-715k-1.5T for the model info
+This is a 1.1B parameter llama model converted into 16-bit gguf. See https://huggingface.co/Tensoic/Tiny-Llama-openhermes-1.1B-step-715k-1.5T for the model info
 
 ```bash
-wget https://huggingface.co/SDFASDGA/llm/resolve/main/ggml-model-f32.gguf
+wget https://huggingface.co/SDFASDGA/llm/resolve/main/ggml-model-f16.gguf
 ```
 
 ### Run the model
 
 ```bash
-$ ./llm -m ggml-model-f32.gguf -t 0.9 -v -n 96 -p "I stopped posting on knitting forums because"
+$ ./llm -m ggml-model-f16.gguf -v -t 0.9 -p "I stopped posting in knitting forums because" -n 96
+ GGUF Header Info
+ Magic number:   1179993927
+ Version:            3
+ Tensor Count:                   201
+ Key-Value Pairs:                    18
+ general.architecture                                            
+ llama                                                           
+ general.name                                                    
+ llm                                                             
+ llama.context_length                                            
+        2048
+ llama.embedding_length                                          
+        2048
+ llama.block_count                                               
+          22
+ llama.feed_forward_length                                       
+        5632
+ llama.rope.dimension_count                                      
+          64
+ llama.attention.head_count                                      
+          32
+ llama.attention.head_count_kv                                   
+           4
+ llama.attention.layer_norm_rms_epsilon                          
+   9.99999975E-06
+ general.file_type                                               
+           1
+ tokenizer.ggml.model                                            
+ llama                                                           
+ tokenizer.ggml.tokens                                           
+       32000
+ tokenizer.ggml.scores                                           
+       32000
+ tokenizer.ggml.token_type                                       
+       32000
+ tokenizer.ggml.bos_token_id                                     
+           1
+ tokenizer.ggml.eos_token_id                                     
+           2
+ tokenizer.ggml.unknown_token_id                                 
+           0
+ Position      735611
+ Deficit          26
+ data offset      735617
  Embedding dimension:         2048
  Hidden dimension:         5632
  Layers:           22
@@ -54,19 +98,15 @@ found 32000 tokens
 found 32000 scores
  maximum token length           48
  Loaded weights
-I stopped posting on knitting forums because I couldn't find the 
-knitters I was looking for, and it often seemed that no longer 
-interested knitters would post here. Groups like Ravelry and 
-Knitters' Yarn Added are important to all of us, and I really thought 
-it was time for our own site to be my own place to showcase my work, 
-to find people who were interested in knitting, and on and on. 
- Inference time:    22.5280018      seconds
-   4.21697426     tokens/second
+I stopped posting in knitting forums because they grew so toxic and self-centered. I have recommended listerine for every application to help with dryness and irritation and give a nice soothing rinsing effect. This is a common criticism from knitters with dry skin issues.<0x0A>I recently purchased some of Luxatox Extreme Dry Skin Balm (I almost called it Extreme Skin Care) and I love it! 
+ Inference time:    14.2080011      seconds
+   6.68637371     tokens/second
  Timings
-           1   26.6666660    
+           1   17.3333340    
            2   0.00000000    
-           3   0.00000000    
-           4   192.000000    
+           3   1.33333337    
+           4   118.666664    
+           5   12.0000000 
            5   17.3333340 
 ```
 
@@ -82,7 +122,7 @@ Models may load slightly faster if you convert to the "ak" file format (from And
 
 If you want to use `llm.f90` for a project and need support, please get in touch. See the `motivation` section below for information about the "philosophy". We want any features added to not add complexity, so for example quantization will be written as a separate program.
 
-- :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv)
+- :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv). This 16-bit branch runs at ~6.6/7.4 of the speed and is still under development
 - :construction: Parallelism: see https://github.com/rbitr/llama2.f90/tree/version_0 (also with 16-bit quantization)
 - :construction: Quantization: see https://github.com/rbitr/llama2.f90/tree/f16_convert and https://github.com/rbitr/llama2.f90/tree/four_bit_dev for 16-bit and 4-bit respectively
 - :soon: Support for other models
