@@ -480,8 +480,8 @@ contains
       
         ! normalize and apply weigths. Note fortran built in dot product    
         function rmsnorm(x,w) result(xr)
-              real(kind=wp) :: x(:), w(:)
-              real(kind=wp) :: xr(size(x))
+              real(kind=wp), intent(in) :: x(emb_dim), w(emb_dim)
+              real(kind=wp) :: xr(emb_dim)
               real(kind=wp) :: xn
               xn = sqrt(dot_product(x,x)/size(x)+1e-5)
 
@@ -508,6 +508,19 @@ contains
               p(:s) = xi/sum(xi) 
 
         end function 
+
+         pure function softmax_sl(x,s) result (p)
+              real(kind=wp), intent(in) :: x(seq_len)
+              integer, intent(in) :: s
+              real(kind=wp) :: p(seq_len)
+              real(kind=wp) :: xi(s)
+
+              p(:) = 0
+              xi = exp(x(:s)-maxval(x(:s)))
+              p(:s) = xi/sum(xi)
+
+        end function
+
 
         function transformer(token, pos, s, w) result(logits)
                 integer, intent(in) :: token, pos
@@ -616,7 +629,7 @@ contains
                         end do  
           
                         ! beginning to POS, inclusive. so if pos = 1, there is 1...      
-                        s%att(:,h+1) = softmax(s%att(:,h+1),pos)
+                        s%att(:,h+1) = softmax_sl(s%att(:,h+1),pos)
                         xbh(:) = 0  
                         
                         do t = 1,(pos) 
