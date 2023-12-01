@@ -1,10 +1,11 @@
-FORTRAN = gfortran-10
-GCC = gcc-10
+FORTRAN = gfortran-13
+GCC = gcc-13
 
 .DEFAULT_GOAL := all
 
-FLAGS = -O3 -march=native -mtune=native -ffast-math -funroll-loops -fno-strict-aliasing -flto -fPIC 
+FLAGS = -O3 -fprefetch-loop-arrays -march=native -mtune=native -ffast-math -funroll-loops -fno-strict-aliasing -flto -fwhole-program -fPIC 
  
+#FLAGS = -O3 -fprefetch-loop-arrays -march=native -flto 
 
 convert.o: convert.c
 	$(GCC) -c $(FLAGS) -fno-strict-aliasing convert.c -lm 
@@ -19,7 +20,7 @@ read_ggml.o: read_ggml.f90 weight_module.o
 	$(FORTRAN) -c $(FLAGS) read_ggml.f90
 
 llm: weight_module.o read_ggml.o llama2.o convert.o
-	$(FORTRAN) $(FLAGS) weight_module.o read_ggml.o convert.o llama2.o -o llm 
+	$(FORTRAN) $(FLAGS) weight_module.o read_ggml.o llama2.o convert.o -o llm 
 
 load: load.f90
 	$(FORTRAN) -O3 -march=native -mtune=native -ffast-math -funroll-loops -flto -fPIC load.f90 -o load 

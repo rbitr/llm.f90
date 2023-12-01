@@ -94,7 +94,7 @@ module f32_convert
                         integer(c_int), value :: si
                 end subroutine c_half_to_float_array
         
-                function c_dot_half_to_float_array(input_fp32, input_fp16, si) &
+                pure function c_dot_half_to_float_array(input_fp32, input_fp16, si) &
                                 &bind(C, name="dot_product_fp16_fp32_v2")
                 use iso_c_binding
                         integer(c_int16_t), intent(in) :: input_fp16(*)
@@ -531,6 +531,7 @@ contains
 
                 real(kind=wp) :: x(emb_dim)
                 real(kind=wp) :: xb(emb_dim)
+                real(kind=wp) :: xt(emb_dim)
 
                 ! embeddings
                 real(kind=wp), target :: qkv(emb_dim+2*kv_head_size)
@@ -558,8 +559,13 @@ contains
 
 
                 head_size = emb_dim/n_heads
-
-                logits(:) = 0
+                q => qkv(1:emb_dim)
+                k => qkv((emb_dim+1):(emb_dim+kv_head_size))
+                v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
+                hb => hb13(1:hidden_dim)
+                hb2 => hb13((hidden_dim+1):(2*hidden_dim))                
+                
+                !logits(:) = 0
 
                 ! convert precision        
                 !x = fp16_to_real32(w%token_embedding_table(:,token))
@@ -571,14 +577,15 @@ contains
                         time = time_ms()
                         xb = rmsnorm(x,w%rms_att_weight(:,l))
                         
-                        do ix = 1,size(qkv)
+                        !do ix = 1,size(qkv)
+                        do ix=1,size(qkv)
                         !qkv(ix) = dot_product(xb,v_half_to_float_c(w%wqkv(:,ix,l)))
                         qkv(ix) = c_dot_half_to_float_array(xb,w%wqkv(:,ix,l),emb_dim)
                         end do
                         
-                        q => qkv(1:emb_dim)
-                        k => qkv((emb_dim+1):(emb_dim+kv_head_size))
-                        v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
+                        !q => qkv(1:emb_dim)
+                        !k => qkv((emb_dim+1):(emb_dim+kv_head_size))
+                        !v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
                         
                         
                         s%times(1) = s%times(1) + (time_ms()-time)
@@ -648,8 +655,9 @@ contains
                         
                         do ix=1,emb_dim
                         !x(ix) = x(ix) + dot_product(xb,v_half_to_float_c(w%wo(:,ix,l)))
-                        x(ix) = x(ix) + c_dot_half_to_float_array(xb,w%wo(:,ix,l),emb_dim)
+                        xt(ix) = c_dot_half_to_float_array(xb,w%wo(:,ix,l),emb_dim)
                         end do
+                        x = x + xt
                         
 
                         xb = rmsnorm(x,w%rms_ffn_weight(:,l))
@@ -658,16 +666,17 @@ contains
                         !hb13(ix) = dot_product(xb,v_half_to_float_c(w%w13(:,ix,l)))
                         hb13(ix) = c_dot_half_to_float_array(xb,w%w13(:,ix,l),emb_dim)
                         end do
-                        hb => hb13(1:hidden_dim)
-                        hb2 => hb13((hidden_dim+1):(2*hidden_dim))
+                        !hb => hb13(1:hidden_dim)
+                        !hb2 => hb13((hidden_dim+1):(2*hidden_dim))
                         hb = hb*(1/(1+exp(-hb)))
                         hb = hb*hb2
 
                         do ix = 1,emb_dim
                         !x(ix) = x(ix) + dot_product(hb,v_half_to_float_c(w%w2(:,ix,l)))
-                        x(ix) = x(ix) + c_dot_half_to_float_array(hb,w%w2(:,ix,l),hidden_dim)
+                        xt(ix) = c_dot_half_to_float_array(hb,w%w2(:,ix,l),hidden_dim)
                         end do
-
+                        x = x + xt
+                        
                         s%times(4) = s%times(4) + (time_ms() - time)
 
                 end do
