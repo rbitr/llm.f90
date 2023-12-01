@@ -122,7 +122,7 @@ Models may load slightly faster if you convert to the "ak" file format (from And
 
 If you want to use `llm.f90` for a project and need support, please get in touch. See the `motivation` section below for information about the "philosophy". We want any features added to not add complexity, so for example quantization will be written as a separate program.
 
-- :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv). This 16-bit branch runs at ~6.6/7.4 of the speed and is still under development
+- :white_check_mark: Speed: currently matches llama.cpp for single thread 32-bit operation (tested on a single intel machine so ymmv). This 16-bit branch runs at ~~6.6~~7.3/7.4 of the speed and is still under development
 - :construction: Parallelism: see https://github.com/rbitr/llama2.f90/tree/version_0 (also with 16-bit quantization)
 - :construction: Quantization: see https://github.com/rbitr/llama2.f90/tree/f16_convert and https://github.com/rbitr/llama2.f90/tree/four_bit_dev for 16-bit and 4-bit respectively
 - :soon: Support for other models
