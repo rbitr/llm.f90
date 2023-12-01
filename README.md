@@ -8,6 +8,8 @@ Hackable large language model inference in pure Fortran. Builds to a ~100k execu
 
 https://github.com/rbitr/llm.f90/tree/optimize16/purefortran
 
+Current single-core performance of 7.3 tok/s vs 7.4 tok/s for llama.cpp
+
 ## Getting started
 
 The base implementation in the `master` branch runs on a single core only. See the roadmap below for more info on what has been done and what is planned.
