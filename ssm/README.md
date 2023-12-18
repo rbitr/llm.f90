@@ -1,6 +1,8 @@
 # ssm.f90
 
 ![Mamba Inference](assets/aaron.png)
+
+
 Fortran inference code for the [Mamba](https://github.com/state-spaces/mamba) state space model (ssm). Runs on CPU only for the moment but fast enough to use.
 
 Disclaimer: this is a proof-of-concept implementation, there will be bugs and it still needs to be optimized for speed and cleaned up. The current model format will be migrated to gguf. 
@@ -16,7 +18,7 @@ cd llm.f90/ssm
 make
 ```
 
-### Get a model file (supports GGUF format)
+### Get a model file
 
 
 ```bash
@@ -32,7 +34,7 @@ The mamaba models use a GPT NeoX 20B tokenizer. This repo includes a pre-convert
 ### Run the model
 
 ```bash
-$ ./llm -m ~/code/llm/mamba/scratch/mamba-130m/model_converted_full.bin --ak -v -s tokenizer.bin -p "I stopped posting on knitting forums because" -n 100 -t 0.9
+$ ./llm -m model-130m_converted_f32.bin --ak -v -s tokenizer.bin -p "I stopped posting on knitting forums because" -n 100 -t 0.9
  Embedding dimension: (d_model)         768
  Layers:           24
  Vocabulary Size:        50280
