@@ -9,3 +9,4 @@ models1b/*
 massif*
 models
 *.swp
+!ssm/tokenizer.bin
