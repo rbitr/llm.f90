@@ -1,7 +1,8 @@
 # ssm.f90
 
-![Mamba Inference](assets/aaron.png)
-
+<p align="center">
+  <img src="assets/aaron.png" alt="Unleashing Mamba">
+</p>
 
 Fortran inference code for the [Mamba](https://github.com/state-spaces/mamba) state space model (ssm). Runs on CPU only for the moment but fast enough to use.
 
