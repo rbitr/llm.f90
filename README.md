@@ -4,6 +4,8 @@
 
 Hackable large language model inference in pure Fortran. Builds to a ~100k executable that can be run efficiently on a CPU and has zero external dependencies. Between this and sibling project https://github.com/rbitr/ferrite you can create and customize a retrieval augmented (RAG) or other complete language model system.
 
+__See the ssm folder for mamba state space model inference code__
+
 ## Interesting branches
 
 https://github.com/rbitr/llm.f90/tree/optimize16/purefortran
