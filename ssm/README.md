@@ -8,6 +8,8 @@ Fortran inference code for the [Mamba](https://github.com/state-spaces/mamba) st
 
 Disclaimer: this is a proof-of-concept implementation, there will be bugs and it still needs to be optimized for speed and cleaned up. The current model format will be migrated to gguf. 
 
+Currently only tested on linux with gfortran. Please open an issue if you have trouble running it under other circumstances.
+
 See the root [llm.f90](https://github.com/rbitr/llm.f90) readme for more information about the overall project.
 
 ## Getting started
