@@ -1,6 +1,10 @@
 ## Fortran implementation of phi-2 llm
 
-This is a "small" LLM that supposedly peforms well. You can see it is comparatively fast, on my (not so good) computer it runs at 2.75 tok/s on one CPU core (though I think it doesn't scale well to more cores due to memory bandwidth). Part of the [llm.f90](https://github.com/rbitr/llm.f90) model family. __Even if you don't want to run Fortran code, this is a simple and dependency free minimal implementation that makes it comparatively easy to implement the model in your language of choice.__
+Phi-2 is a model developed by Microsoft. See https://huggingface.co/microsoft/phi-2
+
+Most notably, the weights are licensed as Apache 2.0, meaning this is a true open source model not encumbered by any proprietary restrictions like Meta's llama. As such, in my view it's the preferred model to work with right now, if it's suitable powerful. The model is "small" at 2.7 G parameters, but supposedly punches above its weight. 
+
+You can see it is comparatively fast, on my (not so good) computer it runs at 2.75 tok/s on one CPU core (though I think it doesn't scale well to more cores due to memory bandwidth). On a modern computer it should easily be fast enough to use in real time. Part of the [llm.f90](https://github.com/rbitr/llm.f90) model family. __Even if you don't want to run Fortran code, this is a simple and dependency free minimal implementation that makes it comparatively easy to implement the model in your language of choice.__
 
 Still needs some cleanup. I'm hosting the model in gguf format on HF. You can also get the .gguf model from TheBloke I believe or convert it yourself from the MS version released on HF.
 
