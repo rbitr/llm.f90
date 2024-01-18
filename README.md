@@ -12,6 +12,10 @@ https://github.com/rbitr/llm.f90/tree/optimize16/purefortran
 
 Current single-core performance of 7.3 tok/s vs 7.4 tok/s for llama.cpp
 
+https://github.com/rbitr/llm.f90/tree/dev/phi2/phi2
+
+An implementation of the phi-2 model from Microsoft.
+
 ## Getting started
 
 The base implementation in the `master` branch runs on a single core only. See the roadmap below for more info on what has been done and what is planned.
