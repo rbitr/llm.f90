@@ -523,6 +523,24 @@ contains
                         time = time_ms()
                         ! check that this doens't add any time
                         
+                        !do i=1,emb_dim,32
+                        ! 
+                        !do j=1,16
+                        !        rval = pos*freqs(j)
+                        !        fcr = cos(rval)
+                        !        fci = sin(rval)
+                        !        q0 = q(i+j-1)
+                        !        q1 = q(i+j+15)
+                        !        q(i+j-1) = q0 * fcr - q1 * fci
+                        !        q(i+j+15) = q0 * fci + q1 * fcr
+                        !        k0 = k(i+j-1)
+                        !        k1 = k(i+j+15)
+                        !        k(i+j-1) = k0 * fcr - k1 * fci
+                        !        k(i+j+15) = k0 * fci + k1 * fcr
+                        ! 
+                        !end do
+                        !end do
+                        !rope_dim = 32
                         do i=1,rope_dim,2
                                 freqs(int((i-1)/2)+1) = 1.0 / (10000.0 ** (real(i-1,kind=wp) / real(rope_dim,kind=wp)))
                         end do
@@ -532,17 +550,68 @@ contains
                         cosf = cos(freqs*(pos-1))
                         sinf = sin(freqs*(pos-1))
 
-                        do h=1,n_heads
                         qq = q((h-1)*head_size+1 : (h-1)*head_size+rope_dim)
                         kk = k((h-1)*head_size+1 : (h-1)*head_size+rope_dim)
 
                         q((h-1)*head_size+1 : (h-1)*head_size+rope_dim) = qq * cosf + rotate_half(qq) * sinf
                         k((h-1)*head_size+1 : (h-1)*head_size+rope_dim) = kk * cosf + rotate_half(kk) * sinf
-                        end do
+
 
                         !print *, freqs
                         !stop
                         
+                        if (.false.) then
+                        do h=1,n_heads
+                        do i=1,32,2
+                                head_dim = mod(i, 32)
+                                freq = exp(-head_dim * log(10000.0) / 32)
+                                !freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / 16.0))
+                        
+                               !head_dim = mod(i-1,head_size)
+                                !freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / head_size))
+                                rval = pos * freq
+                                fcr = cos(rval)
+                                fci = sin(rval)
+                                q0 = q((h-1)*head_size+i)
+                                q1 = q((h-1)*head_size+i+1)
+                                q((h-1)*head_size+i) = q0 * fcr - q1 * fci
+                                q((h-1)*head_size+i+1) = q0 * fci + q1 * fcr
+                                !if (i<kv_head_size) then
+                                k0 = k((h-1)*head_size+i)
+                                k1 = k((h-1)*head_size+i+1)
+                                k((h-1)*head_size+i) = k0 * fcr - k1 * fci
+                                k((h-1)*head_size+i+1) = k0 * fci + k1 * fcr
+                                !end if
+
+
+                        end do
+                        end do
+                        end if
+
+
+                        if (.false.) then
+                        do i=1,emb_dim,2
+                                head_dim = mod(i-1,16)
+                                freq = exp(-head_dim * log(10000.0) / 16.0)
+                                !freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / 16.0))
+
+                                !head_dim = mod(i-1,head_size)
+                                !freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / head_size))
+                                rval = pos * freq
+                                fcr = cos(rval)
+                                fci = sin(rval)
+                                q0 = q(i)
+                                q1 = q(i+1)
+                                q(i) = q0 * fcr - q1 * fci
+                                q(i+1) = q0 * fci + q1 * fcr
+                                if (i<kv_head_size) then
+                                        k0 = k(i)
+                                        k1 = k(i+1)
+                                        k(i) = k0 * fcr - k1 * fci
+                                        k(i+1) = k0 * fci + k1 * fcr
+                                end if
+                        end do
+                        end if
                         
                         s%times(2) = s%times(2) + (time_ms()-time)
 
