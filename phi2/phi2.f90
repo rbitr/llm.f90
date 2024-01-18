@@ -531,8 +531,8 @@ contains
                         
                         do h=1,n_heads
                         do i=1,head_size,2
-                                head_dim = mod(i,24)
-                                freq = exp(-head_dim * log(10000.0) / 24.0)
+                                head_dim = mod(i,16)
+                                freq = exp(-head_dim * log(10000.0) / 16.0)
                                 !freq = 1.0 / (10000.0 ** (real(head_dim,kind=wp) / 16.0))
                         
                                !head_dim = mod(i-1,head_size)
