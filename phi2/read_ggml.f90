@@ -571,6 +571,15 @@ contains
                 vocab(i) = vocab(i)(1:id-1) // " " //  vocab(i)(id+2:)
                 token_lengths(i) = token_lengths(i) - 1
                 end if
+
+                id = index(vocab(i), "Ċ") ! crlf
+                if (id > 0) then
+                vocab(i) = vocab(i)(1:id-1) // new_line("a") //  vocab(i)(id+2:)
+                token_lengths(i) = token_lengths(i) - 1
+                end if
+
+
+
                 !read(vocab(i)(1:1), "(A)") tbytes(1)
                 !read(vocab(i)(2:2), "(A)") tbytes(2)
                 !read(vocab(i)(3:3), "(A)") tbytes(3)

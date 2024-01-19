@@ -472,26 +472,31 @@ contains
 
                 ! fc layers
                 real(kind=wp), target :: hb(hidden_dim), h0(emb_dim)
-                !real(kind=wp), pointer :: hb(:), hb2(:) 
 
                 ! counters etc
                 integer :: l, i,j, h, t, head_size, ix
                 real(kind=wp) :: time
                 real :: steps(16) = (/(i, i=0,15)/)
-                real :: freqs(rope_dim), cosf(rope_dim), sinf(rope_dim), qq(rope_dim), kk(rope_dim)
+                real :: freqs(rope_dim), cosf(rope_dim), sinf(rope_dim)!, qq(rope_dim), kk(rope_dim)
                 !integer :: rope_dim
                 
-
-                !freqs = exp(-steps * log(10000.0) / 16.0)
 
                 head_size = emb_dim/n_heads
                 q => qkv(1:emb_dim)
                 k => qkv((emb_dim+1):(emb_dim+kv_head_size))
                 v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
-                !hb => hb13(1:hidden_dim)
-                !hb2 => hb13((hidden_dim+1):(2*hidden_dim))                
                 
-                !logits(:) = 0
+                do i=1,rope_dim,2
+                                freqs(int((i-1)/2)+1) = 1.0 / (10000.0 ** (real(i-1,kind=wp) / real(rope_dim,kind=wp)))
+                end do
+
+                freqs(rope_dim/2+1:) = freqs(1:rope_dim/2)
+
+                cosf = cos(freqs*(pos-1))
+                sinf = sin(freqs*(pos-1))
+
+                
+                
 
                 ! convert precision        
                 !x = fp16_to_real32(w%token_embedding_table(:,token))
@@ -512,10 +517,6 @@ contains
                         end do
                         qkv = qkv + w%bqkv(:,l)
                         
-                        !q => qkv(1:emb_dim)
-                        !k => qkv((emb_dim+1):(emb_dim+kv_head_size))
-                        !v => qkv((emb_dim+kv_head_size+1):(emb_dim+2*kv_head_size))
-                        
                         
                         s%times(1) = s%times(1) + (time_ms()-time)
                         ! position encoding
@@ -523,25 +524,14 @@ contains
                         time = time_ms()
                         ! check that this doens't add any time
                         
-                        do i=1,rope_dim,2
-                                freqs(int((i-1)/2)+1) = 1.0 / (10000.0 ** (real(i-1,kind=wp) / real(rope_dim,kind=wp)))
-                        end do
-        
-                        freqs(rope_dim/2+1:) = freqs(1:rope_dim/2)
-
-                        cosf = cos(freqs*(pos-1))
-                        sinf = sin(freqs*(pos-1))
-
                         do h=1,n_heads
-                        qq = q((h-1)*head_size+1 : (h-1)*head_size+rope_dim)
-                        kk = k((h-1)*head_size+1 : (h-1)*head_size+rope_dim)
-
-                        q((h-1)*head_size+1 : (h-1)*head_size+rope_dim) = qq * cosf + rotate_half(qq) * sinf
-                        k((h-1)*head_size+1 : (h-1)*head_size+rope_dim) = kk * cosf + rotate_half(kk) * sinf
+                        associate (qq => q((h-1)*head_size+1 : (h-1)*head_size+rope_dim), &
+                                        &kk => k((h-1)*head_size+1 : (h-1)*head_size+rope_dim))
+                        qq = qq * cosf + rotate_half(qq) * sinf
+                        kk = kk * cosf + rotate_half(kk) * sinf
+                        
+                        end associate 
                         end do
-
-                        !print *, freqs
-                        !stop
                         
                         
                         s%times(2) = s%times(2) + (time_ms()-time)
