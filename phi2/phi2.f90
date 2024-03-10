@@ -115,6 +115,7 @@ program llama2
         use weight_module
         use arg_parse
         use read_ggml, only: load_ggml
+        use pretokenize, only: pre_tokenize, decode, init
         use f32_convert
         !use omp_lib
 
@@ -168,6 +169,7 @@ program llama2
         real(kind=wp) :: t_ms_start, t_ms_end
 
 
+        call init
         call parse_args(arg_values)
 
         verbose = arg_values%verbose
@@ -271,6 +273,10 @@ program llama2
 
         t_ms_start = 0
         ! encode the prompt
+        prompt = trim(pre_tokenize(prompt))
+        if (verbose) then
+                print *, "Pre-tokenized prompt: ", prompt
+        end if
         prompt_tokens = bpe_encode(prompt)
         
         if (verbose) then
@@ -301,7 +307,7 @@ program llama2
                 end if
 
                 ! here we kept track of the length to display each token properly
-                write (*,fmt="(A)", advance="no") vocab(token)(1:vocab_len(token))
+                write (*,fmt="(A)", advance="no") decode(vocab(token),vocab_len(token))!(1:vocab_len(token))
                 
                 ! start after first token as in llama2.c
                 if (t_ms_start == 0) then
@@ -645,16 +651,40 @@ contains
                 character(len=*) :: text
                 integer, allocatable :: tokens(:)
                 integer, allocatable :: tmp_tokens(:)
-                integer :: i, ind, best_id, t1, t2
+                integer :: i,j, ind, best_id, t1, t2
                 real(kind=wp) :: score, best_score
                 character(:), dimension(:), allocatable :: running_merge
                 integer, allocatable :: running_merge_len(:)
+                integer(1) :: t
 
-                allocate(tokens(len(text)))
+                allocate(tmp_tokens(len(text)))
 
-                do i = 1,len(text)
-                        tokens(i) = lookup(text(i:i), 1)
+                i = 1
+                j = 1
+                
+                do while (i <= len(text)) !i = 1,len(text)
+                        !tokens(i) = lookup(text(i:i), 1)
+                        ! should be able to either have 1 or 2 byte encoding
+                        ! because all unicode has been byte encoded
+                        read(text(i:i), "(A)") t
+                        if (t >= 0 .and. t < 128) then
+                        tmp_tokens(j) = lookup(text(i:i),1)
+                        i = i + 1
+                        else
+                        tmp_tokens(j) = lookup(text(i:i+1),2)
+                        i = i + 2
+                        end if
+                        j = j + 1
+                        !if (verbose) then
+                        !        print *, tmp_tokens(j-1)
+                        !end if 
                 end do
+
+                allocate(tokens(j-1))
+                do i = 1,(j-1)
+                        tokens(i) = tmp_tokens(i)
+                end do
+                deallocate(tmp_tokens)
 
 
                 do while(1==1)

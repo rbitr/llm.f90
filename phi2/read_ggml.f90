@@ -565,18 +565,19 @@ contains
                 !temp_int = 10
                 !write(8) maxlen 
                 do i=1,size(vocab)
-                
-                id = index(vocab(i), "Ġ") ! space character
-                if (id > 0) then
-                vocab(i) = vocab(i)(1:id-1) // " " //  vocab(i)(id+2:)
-                token_lengths(i) = token_lengths(i) - 1
-                end if
+                ! uncomment to put spaces and newlines in
 
-                id = index(vocab(i), "Ċ") ! crlf
-                if (id > 0) then
-                vocab(i) = vocab(i)(1:id-1) // new_line("a") //  vocab(i)(id+2:)
-                token_lengths(i) = token_lengths(i) - 1
-                end if
+                !id = index(vocab(i), "Ġ") ! space character
+                !if (id > 0) then
+                !vocab(i) = vocab(i)(1:id-1) // " " //  vocab(i)(id+2:)
+                !token_lengths(i) = token_lengths(i) - 1
+                !end if
+
+                !id = index(vocab(i), "Ċ") ! crlf
+                !if (id > 0) then
+                !vocab(i) = vocab(i)(1:id-1) // new_line("a") //  vocab(i)(id+2:)
+                !token_lengths(i) = token_lengths(i) - 1
+                !end if
 
 
 

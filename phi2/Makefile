@@ -13,14 +13,17 @@ convert.o: convert.c
 weight_module.o: weight_module.f90 
 	$(FORTRAN) -c $(FLAGS) weight_module.f90
 
+pretokenize.o: pretokenize.f90
+	$(FORTRAN) -c $(FLAGS) pretokenize.f90
+
 phi2.o: phi2.f90 
 	$(FORTRAN) -c $(FLAGS) phi2.f90  
 
 read_ggml.o: read_ggml.f90 weight_module.o
 	$(FORTRAN) -c $(FLAGS) read_ggml.f90
 
-llm: weight_module.o read_ggml.o phi2.o convert.o
-	$(FORTRAN) $(FLAGS) weight_module.o read_ggml.o phi2.o convert.o -o llm 
+llm: weight_module.o read_ggml.o pretokenize.o phi2.o convert.o
+	$(FORTRAN) $(FLAGS) weight_module.o read_ggml.o pretokenize.o phi2.o convert.o -o llm 
 
 
 all: llm
