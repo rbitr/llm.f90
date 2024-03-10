@@ -286,28 +286,84 @@ contains
 
 
                 allocate(w%wqkv(emb_length,emb_length+2*kv_head_size,num_layers))
-                do i = 1,num_layers
-                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_qkv.weight"
+                !do i = 1,num_layers
+                !        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_qkv.weight"
+                !        t0 = tensor_by_name(tempstr)
+                !        temp_gt = read_layer(5,t0,file_pos)
+                !        ! f16
+                !        !call write_tensor(8,temp_gt)
+                !        w%wqkv(:,:,i) = temp_gt%f162d
+                !end do 
+
+                                do i = 1,num_layers
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_q.weight"
                         t0 = tensor_by_name(tempstr)
                         temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
-                        w%wqkv(:,:,i) = temp_gt%f162d
-                end do 
+                        w%wqkv(:,1:emb_length,i) = temp_gt%f162d
+                end do
+
+                do i = 1,num_layers
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_k.weight"
+                        t0 = tensor_by_name(tempstr)
+                        temp_gt = read_layer(5,t0,file_pos)
+                        ! f16
+                        !call write_tensor(8,temp_gt)
+                        w%wqkv(:,emb_length+1:emb_length+kv_head_size,i) = temp_gt%f162d
+                end do
+
+                do i = 1,num_layers
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_v.weight"
+                        t0 = tensor_by_name(tempstr)
+                        temp_gt = read_layer(5,t0,file_pos)
+                        ! f16
+                        !call write_tensor(8,temp_gt)
+                        w%wqkv(:,emb_length+kv_head_size+1:,i) = temp_gt%f162d
+                end do
+
 
                 if (verbose) then
                         print *, "loaded qkv weights:", size(w%wqkv(:,1:emb_length,:))
                 end if
 
                 allocate(w%bqkv(emb_length+2*kv_head_size,num_layers))
+                !do i = 1,num_layers
+                !        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_qkv.bias"
+                !        t0 = tensor_by_name(tempstr)
+                !        temp_gt = read_layer(5,t0,file_pos)
+                !        ! f16
+                !        !call write_tensor(8,temp_gt)
+                !        w%bqkv(:,i) = temp_gt%f321d
+                !end do
+
                 do i = 1,num_layers
-                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_qkv.bias"
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_q.bias"
                         t0 = tensor_by_name(tempstr)
                         temp_gt = read_layer(5,t0,file_pos)
                         ! f16
                         !call write_tensor(8,temp_gt)
-                        w%bqkv(:,i) = temp_gt%f321d
+                        w%bqkv(1:emb_length,i) = temp_gt%f321d
                 end do
+
+                do i = 1,num_layers
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_k.bias"
+                        t0 = tensor_by_name(tempstr)
+                        temp_gt = read_layer(5,t0,file_pos)
+                        ! f16
+                        !call write_tensor(8,temp_gt)
+                        w%bqkv(emb_length+1:emb_length+kv_head_size,i) = temp_gt%f321d
+                end do
+
+                do i = 1,num_layers
+                        write(tempstr,"(A,I0,A)") "blk.", i-1, ".attn_v.bias"
+                        t0 = tensor_by_name(tempstr)
+                        temp_gt = read_layer(5,t0,file_pos)
+                        ! f16
+                        !call write_tensor(8,temp_gt)
+                        w%bqkv(emb_length+kv_head_size+1:,i) = temp_gt%f321d
+                end do
+
 
                 if (verbose) then
                         print *, "loaded qkv biases:", size(w%bqkv)

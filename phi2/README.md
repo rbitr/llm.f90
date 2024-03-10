@@ -34,4 +34,42 @@ You can construct a Fibonacci sequence as follows:ĊĊ1. Give the first two numb
 
 ``` 
 
+Now includes proper(ish) unicode support. Tested with the [phi2-ko](https://huggingface.co/daekeun-ml/phi-2-ko-v0.1) Korean model:
+
+```
+$ wget https://huggingface.co/SDFASDGA/llm/resolve/main/phi-2-ko-v0.1/ggml-model-f16.gguf
+...
+$ ./llm -m /mnt/ssd/llm/phi-2-ko-v0.1/ggml-model-f16.gguf -n 96 -t 0.9 -p "시도해  볼만한 음식 목록은 다음과 같습니다." -v
+found 66676 tokens
+ loading merges
+found 66529 merges
+ maximum token length          256
+ Loaded weights
+ Pre-tokenized prompt: ìĭľëıĦíķ´Ġë³¼ë§ĮíķľĠìĿĮìĭĿĠëª©ë¡ĿìĿĢĠëĭ¤ìĿĮê³¼Ġê°ĻìĬµëĭĪëĭ¤.
+       62205 ìĭľëıĦ                                                    
+       50322 íķ´                                                          
+       51308 Ġë³¼                                                        
+       52797 ë§Įíķľ                                                    
+       55763 ĠìĿĮìĭĿ                                                  
+       54401 Ġëª©ë¡Ŀ                                                  
+       50299 ìĿĢ                                                          
+       53962 Ġëĭ¤ìĿĮê³¼                                            
+       60150 Ġê°ĻìĬµëĭĪëĭ¤                                      
+          14 .                                                               
+시도해 볼만한 음식 목록은 다음과 같습니다.
+
+* 랍큐'나쿠사: 닭고기의 닭다리살, 해삼, 카레소스를 넣어 끓인 햄.
+* 라디에이터 스칸다르: 감자튀김, 토마토 소스, 양파, 손질한 감자를 넣어 튀김.
+* 미카야 이투리: 돼지고기, 유부갈비, 야채, 허브 등을 조리가 
+ Inference time:    34.4960022      seconds
+   2.75394249     tokens/second
+ Timings
+           1   70.6666641    
+           2   0.00000000    
+           3   3.33333325    
+           4   270.000000    
+           5   18.6666660    
+
+```
+
 Implementation note: phi appears to differ from llama in that the rotary encoding is only applied to part of the q/k values (32/80 on each head) and that the real/imag parts are grouped and concatenated instead of alternating. Once you figure that out, it's easy to implement.
